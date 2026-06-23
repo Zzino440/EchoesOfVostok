@@ -88,6 +88,7 @@ func _physics_process(_delta: float) -> void:
 
 	# Menu: throttled, non critico
 	if Engine.get_physics_frames() % 20 == 0:
+		_config.refresh_current_area_range()
 		_menu_music.tick()
 		_debug_overlay.tick()
 
