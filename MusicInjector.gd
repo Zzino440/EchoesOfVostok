@@ -18,6 +18,12 @@ const ZONE_KEY_MAP := {
 
 const SELECTION_RANDOM := "random"
 const SELECTION_CYCLE := "cycle"
+const VANILLA_TRACK_COUNTS := {
+	"area05": 4,
+	"borderZone": 4,
+	"vostok": 4,
+	"shelter": 2,
+}
 
 var enabled: bool = true
 var paused: bool = false
@@ -34,6 +40,7 @@ var _music_player: AudioStreamPlayer = null
 var _force_stream: AudioStream    = null
 var _force_display: String        = ""
 var _force_source: String         = "mod"
+var _force_zone: String           = "forced"
 var _force_tween: Tween           = null
 var _cycle_indices_by_zone: Dictionary = {}
 var _current_track_info: Dictionary = {}
@@ -90,7 +97,7 @@ func tick() -> void:
 
 	# Force esplicito da MCM: ha priorita' assoluta
 	if _force_stream != null:
-		_play_now(_force_stream, _force_display, _force_source, "forced")
+		_play_now(_force_stream, _force_display, _force_source, _force_zone)
 		print("[music-expansion] Force: traccia avviata.")
 		_clear_queued_force()
 		return
@@ -122,6 +129,23 @@ func get_current_track_info() -> Dictionary:
 			_current_track_info = _build_track_info_for_stream(_music_player.stream)
 	return _current_track_info.duplicate()
 
+func get_current_zone_key() -> String:
+	return _get_current_zone_key()
+
+func get_resolved_zone_key(zone_key: String) -> String:
+	if zone_key == "current":
+		return _get_current_zone_key()
+	return zone_key
+
+func get_zone_pool_count(zone_key: String) -> int:
+	var resolved_zone := get_resolved_zone_key(zone_key)
+	if resolved_zone.is_empty():
+		return _fallback_pool_count(zone_key)
+	var pool: Array = _build_zone_pool(resolved_zone)
+	if not pool.is_empty():
+		return pool.size()
+	return _fallback_pool_count(resolved_zone)
+
 func set_enabled(v: bool) -> void:
 	enabled = v
 	if not v and _music_player != null and is_instance_valid(_music_player):
@@ -139,40 +163,40 @@ func set_selection_mode(mode: String) -> void:
 	selection_mode = SELECTION_CYCLE if mode == SELECTION_CYCLE else SELECTION_RANDOM
 
 # Forza la riproduzione di uno stream con fade out ~1s poi play.
-func force_track(stream: AudioStream, display_name: String = "", source: String = "mod") -> void:
+func force_track(stream: AudioStream, display_name: String = "", source: String = "mod", zone_key: String = "forced") -> void:
 	print("[music-expansion] force_track richiesto.")
 	_force_stream = stream
 	_force_display = display_name
 	_force_source = source
+	_force_zone = zone_key
 	if _music_player == null or not is_instance_valid(_music_player):
 		print("[music-expansion] force_track: music player non disponibile (non sei in gameplay?).")
 		return
 	_cancel_tween()
 	_music_player.stop()
-	_play_now(stream, display_name, source, "forced")
+	_play_now(stream, display_name, source, zone_key)
 	_clear_queued_force()
 
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
-	if zone_key == "current":
-		zone_key = _get_current_zone_key()
-	if zone_key.is_empty():
+	var resolved_zone := get_resolved_zone_key(zone_key)
+	if resolved_zone.is_empty():
 		push_warning("[music-expansion] Nessuna area valida per il ciclo tracce.")
 		return
-	var pool: Array = _build_zone_pool(zone_key)
+	var pool: Array = _build_zone_pool(resolved_zone)
 	if pool.is_empty():
-		push_warning("[music-expansion] Nessuna traccia disponibile per zona '%s'." % zone_key)
+		push_warning("[music-expansion] Nessuna traccia disponibile per zona '%s'." % resolved_zone)
 		return
 	var safe_index := posmod(index_zero_based, pool.size())
 	var entry: Dictionary = pool[safe_index]
 	var stream: AudioStream = entry.get("stream", null)
 	if stream == null:
-		push_warning("[music-expansion] Traccia #%d non valida per zona '%s'." % [safe_index + 1, zone_key])
+		push_warning("[music-expansion] Traccia #%d non valida per zona '%s'." % [safe_index + 1, resolved_zone])
 		return
 	print("[music-expansion] Ciclo zona '%s': %s" % [
-		zone_key,
+		resolved_zone,
 		str(entry.get("display", "traccia"))
 	])
-	force_track(stream, str(entry.get("display", "traccia")), str(entry.get("source", "")))
+	force_track(stream, str(entry.get("display", "traccia")), str(entry.get("source", "")), resolved_zone)
 
 func clear_force() -> void:
 	_clear_queued_force()
@@ -270,6 +294,7 @@ func _clear_queued_force() -> void:
 	_force_stream = null
 	_force_display = ""
 	_force_source = "mod"
+	_force_zone = "forced"
 
 func _fallback_display_name(stream: AudioStream, display_name: String) -> String:
 	if not display_name.is_empty():
@@ -324,3 +349,21 @@ func _display_from_resource_path(stream: AudioStream) -> String:
 	if path.is_empty():
 		return ""
 	return path.get_file()
+
+func _fallback_pool_count(zone_key: String) -> int:
+	if zone_key == "current":
+		var current_zone := _get_current_zone_key()
+		if current_zone.is_empty():
+			return _max_fallback_pool_count()
+		zone_key = current_zone
+	var vanilla_count := int(VANILLA_TRACK_COUNTS.get(zone_key, 0))
+	var mod_count := 0
+	if _library != null:
+		mod_count = _library.get_track_count_for_zone(zone_key)
+	return vanilla_count + mod_count
+
+func _max_fallback_pool_count() -> int:
+	var max_count := 0
+	for zone_key in VANILLA_TRACK_COUNTS.keys():
+		max_count = max(max_count, _fallback_pool_count(str(zone_key)))
+	return max_count

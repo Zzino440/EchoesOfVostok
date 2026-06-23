@@ -65,6 +65,8 @@ var _on_update: Callable
 var _injector = null  # MusicInjector (per force_track live via on_value_changed)
 var _library  = null  # TrackLibrary (per le options del dropdown)
 var _last_cycle_signature := ""
+var _last_cycle_menu = null
+var _last_resolved_cycle_zone := ""
 
 ## Inizializza: carica/crea config ini e registra MCM se disponibile.
 ## on_update: Callable senza argomenti, chiamata dopo ogni cambio di config.
@@ -107,6 +109,9 @@ func setup(library, injector, on_update: Callable) -> void:
 
 # Callback MCM: viene chiamata al salvataggio della config dall'UI MCM.
 func _on_mcm_save(config: ConfigFile) -> void:
+	var config_changed := _refresh_dynamic_config(config)
+	if config_changed:
+		config.save(MCM_FILE_PATH + "/config.ini")
 	_apply_config(config)
 	_apply_cycle_if_changed()
 	if _on_update.is_valid():
@@ -132,12 +137,14 @@ func _on_selection_mode_changed(_value_id: String, new_value, _menu) -> void:
 	if _injector != null:
 		_injector.set_selection_mode(selection_mode)
 
-func _on_test_area_changed(_value_id: String, new_value, _menu) -> void:
+func _on_test_area_changed(_value_id: String, new_value, menu) -> void:
 	test_area_key = _resolve_area_key(new_value)
+	_last_resolved_cycle_zone = _resolved_cycle_zone_for(test_area_key)
+	_sync_cycle_range_in_menu(menu)
 	_apply_cycle_now()
 
 func _on_cycle_area_track_changed(_value_id: String, new_value, _menu) -> void:
-	cycle_track_number = max(1, int(new_value))
+	cycle_track_number = _clamp_cycle_track_number(int(new_value), test_area_key)
 	_apply_cycle_now()
 
 func _on_debug_overlay_enabled_changed(_value_id: String, new_value, _menu) -> void:
@@ -150,13 +157,23 @@ func _on_debug_overlay_position_changed(_value_id: String, new_value, _menu) -> 
 	if _on_update.is_valid():
 		_on_update.call()
 
+func refresh_current_area_range(menu = null) -> void:
+	if _injector == null or test_area_key != AREA_CURRENT:
+		return
+	var resolved_zone := _resolved_cycle_zone_for(AREA_CURRENT)
+	if resolved_zone.is_empty() or resolved_zone == _last_resolved_cycle_zone:
+		return
+	_last_resolved_cycle_zone = resolved_zone
+	_sync_cycle_range_in_menu(_cycle_menu_or_stored(menu))
+
 func _apply_config(config: ConfigFile) -> void:
 	enabled   = bool(_cfg(config, "Bool",  "enabled",         DEFAULT_ENABLED))
 	paused    = bool(_cfg(config, "Bool",  "paused",          DEFAULT_PAUSED))
 	volume_db = float(_cfg(config, "Float", "track_volume_db", DEFAULT_VOLUME_DB))
 	selection_mode = _resolve_selection_mode(_cfg(config, "Dropdown", "selection_mode", SELECTION_RANDOM))
 	test_area_key = _resolve_area_key(_cfg(config, "Dropdown", "test_area", AREA_LABEL_CURRENT))
-	cycle_track_number = max(1, int(_cfg(config, "Int", "cycle_area_track", 1)))
+	cycle_track_number = _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), test_area_key)
+	_last_resolved_cycle_zone = _resolved_cycle_zone_for(test_area_key)
 	debug_overlay_enabled = bool(_cfg(config, "Bool", "debug_overlay_enabled", false))
 	debug_overlay_position = _resolve_debug_overlay_position(_cfg(config, "Dropdown", "debug_overlay_position", OVERLAY_TOP_RIGHT))
 
@@ -274,7 +291,27 @@ func _force_track_options() -> Array:
 	return options
 
 func _max_cycle_range() -> int:
-	return 32
+	return _cycle_range_for_area(test_area_key)
+
+func _cycle_range_for_area(area_key: String) -> int:
+	var count := 0
+	if _injector != null:
+		count = _injector.get_zone_pool_count(area_key)
+	if count <= 0 and _library != null:
+		if area_key == AREA_CURRENT:
+			count = _library.get_max_zone_track_count()
+		else:
+			count = _library.get_track_count_for_zone(area_key)
+	return max(1, count)
+
+func _clamp_cycle_track_number(value: int, area_key: String) -> int:
+	var max_range := _cycle_range_for_area(area_key)
+	return min(max(1, value), max_range)
+
+func _resolved_cycle_zone_for(area_key: String) -> String:
+	if _injector == null:
+		return ""
+	return _injector.get_resolved_zone_key(area_key)
 
 func _is_force_off(value) -> bool:
 	return _resolve_dropdown_label(value, _force_track_options()) == FORCE_OFF_LABEL
@@ -341,6 +378,7 @@ func _apply_cycle_if_changed() -> void:
 func _apply_cycle_now() -> void:
 	if _injector == null:
 		return
+	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, test_area_key)
 	_last_cycle_signature = _cycle_signature()
 	_injector.force_zone_track(test_area_key, cycle_track_number - 1)
 
@@ -353,7 +391,11 @@ func _refresh_dynamic_config(config: ConfigFile) -> bool:
 	changed = _set_config_entry_value(config, "Dropdown", "selection_mode", "options", SELECTION_OPTIONS) or changed
 	changed = _set_config_entry_value(config, "Dropdown", "debug_overlay_position", "options", OVERLAY_POSITION_OPTIONS) or changed
 	changed = _set_config_entry_value(config, "Dropdown", "test_area", "options", AREA_OPTIONS) or changed
-	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "maxRange", _max_cycle_range()) or changed
+	var area_key := _resolve_area_key(_cfg(config, "Dropdown", "test_area", AREA_LABEL_CURRENT))
+	var max_range := _cycle_range_for_area(area_key)
+	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "maxRange", max_range) or changed
+	var cycle_value := _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), area_key)
+	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "value", cycle_value) or changed
 	return changed
 
 func _set_config_entry_value(config: ConfigFile, section: String, key: String, entry_key: String, value) -> bool:
@@ -365,3 +407,44 @@ func _set_config_entry_value(config: ConfigFile, section: String, key: String, e
 	entry[entry_key] = value
 	config.set_value(section, key, entry)
 	return true
+
+func _sync_cycle_range_in_menu(menu) -> void:
+	const MIN_RANGE := 1
+	var active_menu = _cycle_menu_or_stored(menu)
+	var max_range := _cycle_range_for_area(test_area_key)
+	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, test_area_key)
+	if active_menu == null or not active_menu.has_method("GetElements"):
+		return
+	var elements: Dictionary = active_menu.GetElements()
+	if not elements.has("cycle_area_track"):
+		return
+	var element = elements["cycle_area_track"]
+	if element == null:
+		return
+	var value_data = element.get("valueData")
+	if value_data is Dictionary:
+		value_data["minRange"] = MIN_RANGE
+		value_data["maxRange"] = max_range
+	if element is Node:
+		_sync_range_nodes(element as Node, MIN_RANGE, max_range, cycle_track_number)
+	if element.has_method("SetValue"):
+		element.SetValue(cycle_track_number)
+
+func _cycle_menu_or_stored(menu):
+	if menu != null and menu.has_method("GetElements"):
+		_last_cycle_menu = menu
+		return menu
+	if _last_cycle_menu != null and is_instance_valid(_last_cycle_menu):
+		return _last_cycle_menu
+	return null
+
+func _sync_range_nodes(node: Node, min_range: int, max_range: int, value: int) -> void:
+	if node is Range:
+		var range_control: Range = node as Range
+		range_control.min_value = float(min_range)
+		range_control.max_value = float(max_range)
+		range_control.step = 1.0
+		range_control.value = float(value)
+	for child in node.get_children():
+		if child is Node:
+			_sync_range_nodes(child as Node, min_range, max_range, value)
