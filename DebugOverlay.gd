@@ -2,6 +2,13 @@ extends CanvasLayer
 
 const POSITION_TOP_LEFT := "top_left"
 const POSITION_TOP_RIGHT := "top_right"
+const ZONE_LABELS := {
+	"area05": "Area 05",
+	"borderZone": "Border Zone",
+	"vostok": "Vostok",
+	"shelter": "Shelter",
+	"forced": "Forced",
+}
 
 var enabled: bool = false
 var position: String = POSITION_TOP_RIGHT
@@ -52,28 +59,32 @@ func _format_info(info: Dictionary) -> String:
 	var source_label := "CUSTOM" if source == "mod" else "VANILLA"
 	var display := str(info.get("display", "Unknown track"))
 	var zone := str(info.get("zone", ""))
-	var zone_text := ""
-	if not zone.is_empty() and zone != "forced":
-		zone_text = "Zone: %s\n" % zone
-	return "MusicExpansion\n%s\n%s%s" % [source_label, zone_text, display]
+	var zone_label := ZONE_LABELS.get(zone, zone)
+	if zone_label.is_empty():
+		zone_label = "Unknown"
+	return "MusicExpansion\n%s\nTrack: %s\nZone: %s" % [
+		source_label,
+		display,
+		zone_label,
+	]
 
 func _apply_position() -> void:
 	if _label == null:
 		return
-	_label.size = Vector2(520, 76)
-	_label.custom_minimum_size = Vector2(360, 64)
+	_label.size = Vector2(620, 118)
+	_label.custom_minimum_size = Vector2(420, 104)
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	if position == POSITION_TOP_LEFT:
 		_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_label.offset_left = 18
 		_label.offset_top = 16
-		_label.offset_right = 538
-		_label.offset_bottom = 92
+		_label.offset_right = 638
+		_label.offset_bottom = 134
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	else:
 		_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		_label.offset_left = -538
+		_label.offset_left = -638
 		_label.offset_top = 16
 		_label.offset_right = -18
-		_label.offset_bottom = 92
+		_label.offset_bottom = 134
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

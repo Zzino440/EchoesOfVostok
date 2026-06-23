@@ -116,6 +116,10 @@ func tick() -> void:
 # ── API pubblica ───────────────────────────────────────────────────────────────
 
 func get_current_track_info() -> Dictionary:
+	if _music_player != null and is_instance_valid(_music_player) and _music_player.stream != null:
+		var stream_id := _music_player.stream.get_instance_id()
+		if int(_current_track_info.get("stream_id", -1)) != stream_id:
+			_current_track_info = _build_track_info_for_stream(_music_player.stream)
 	return _current_track_info.duplicate()
 
 func set_enabled(v: bool) -> void:
@@ -214,7 +218,7 @@ func _build_zone_pool(zone_key: String) -> Array:
 				if stream is AudioStream and not _pool_has_stream(pool, stream):
 					pool.append({
 						"stream": stream,
-						"display": "[Vanilla %s] %d" % [_library.get_zone_label(zone_key), vanilla_index],
+						"display": _display_for_vanilla_stream(stream, zone_key, vanilla_index),
 						"source": "vanilla",
 					})
 					vanilla_index += 1
@@ -226,10 +230,7 @@ func _build_zone_pool(zone_key: String) -> Array:
 		if stream != null and not _pool_has_stream(pool, stream):
 			pool.append({
 				"stream": stream,
-				"display": "[Mod %s] %s" % [
-					_library.get_zone_label(zone_key),
-					str(entry.get("file_name", "track"))
-				],
+				"display": str(entry.get("file_name", "track")),
 				"source": "mod",
 			})
 	return pool
@@ -257,6 +258,7 @@ func _play_now(stream: AudioStream, display_name: String = "", source: String = 
 		"display": _fallback_display_name(stream, display_name),
 		"source": _fallback_source(stream, source),
 		"zone": zone_key,
+		"stream_id": stream.get_instance_id(),
 	}
 
 func _cancel_tween() -> void:
@@ -275,9 +277,50 @@ func _fallback_display_name(stream: AudioStream, display_name: String) -> String
 	var library_name: String = _library.get_display_name_for_stream(stream)
 	if not library_name.is_empty():
 		return library_name
+	var path_name := _display_from_resource_path(stream)
+	if not path_name.is_empty():
+		return path_name
 	return "Unknown track"
 
 func _fallback_source(stream: AudioStream, source: String) -> String:
 	if not source.is_empty():
 		return source
 	return "mod" if _library.is_our_stream(stream) else "vanilla"
+
+func _build_track_info_for_stream(stream: AudioStream) -> Dictionary:
+	var zone_key := _get_active_preset_zone_key()
+	var pool: Array = []
+	if not zone_key.is_empty():
+		pool = _build_zone_pool(zone_key)
+		for raw_entry in pool:
+			var entry: Dictionary = raw_entry
+			if entry.get("stream", null) == stream:
+				return {
+					"display": str(entry.get("display", "Unknown track")),
+					"source": str(entry.get("source", _fallback_source(stream, ""))),
+					"zone": zone_key,
+					"stream_id": stream.get_instance_id(),
+				}
+
+	var display := _fallback_display_name(stream, "")
+	var source := _fallback_source(stream, "")
+	return {
+		"display": display,
+		"source": source,
+		"zone": zone_key,
+		"stream_id": stream.get_instance_id(),
+	}
+
+func _display_for_vanilla_stream(stream: AudioStream, zone_key: String, index_one_based: int) -> String:
+	var path_name := _display_from_resource_path(stream)
+	if not path_name.is_empty():
+		return path_name
+	return "%s vanilla %d" % [_library.get_zone_label(zone_key), index_one_based]
+
+func _display_from_resource_path(stream: AudioStream) -> String:
+	if stream == null:
+		return ""
+	var path := stream.resource_path
+	if path.is_empty():
+		return ""
+	return path.get_file()
