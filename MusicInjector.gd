@@ -32,8 +32,11 @@ var _audio_node: Node             = null
 var _music_player: AudioStreamPlayer = null
 
 var _force_stream: AudioStream    = null
+var _force_display: String        = ""
+var _force_source: String         = "mod"
 var _force_tween: Tween           = null
 var _cycle_indices_by_zone: Dictionary = {}
+var _current_track_info: Dictionary = {}
 
 func setup(library, parent_node: Node) -> void:
 	_library     = library
@@ -48,6 +51,7 @@ func tick() -> void:
 			print("[music-expansion] Gameplay terminato.")
 			_audio_node    = null
 			_music_player  = null
+			_current_track_info.clear()
 		return
 
 	if audio != _audio_node:
@@ -86,9 +90,9 @@ func tick() -> void:
 
 	# Force esplicito da MCM: ha priorita' assoluta
 	if _force_stream != null:
-		_play_now(_force_stream)
+		_play_now(_force_stream, _force_display, _force_source, "forced")
 		print("[music-expansion] Force: traccia avviata.")
-		_force_stream = null
+		_clear_queued_force()
 		return
 
 	var zone_key := _get_active_preset_zone_key()
@@ -103,13 +107,16 @@ func tick() -> void:
 	var stream: AudioStream = chosen.get("stream", null)
 	if stream == null:
 		return
-	_play_now(stream)
+	_play_now(stream, str(chosen.get("display", "traccia")), str(chosen.get("source", "")), zone_key)
 	print("[music-expansion] Zona '%s': avviata %s." % [
 		zone_key,
 		str(chosen.get("display", "traccia"))
 	])
 
 # ── API pubblica ───────────────────────────────────────────────────────────────
+
+func get_current_track_info() -> Dictionary:
+	return _current_track_info.duplicate()
 
 func set_enabled(v: bool) -> void:
 	enabled = v
@@ -128,16 +135,18 @@ func set_selection_mode(mode: String) -> void:
 	selection_mode = SELECTION_CYCLE if mode == SELECTION_CYCLE else SELECTION_RANDOM
 
 # Forza la riproduzione di uno stream con fade out ~1s poi play.
-func force_track(stream: AudioStream) -> void:
+func force_track(stream: AudioStream, display_name: String = "", source: String = "mod") -> void:
 	print("[music-expansion] force_track richiesto.")
 	_force_stream = stream
+	_force_display = display_name
+	_force_source = source
 	if _music_player == null or not is_instance_valid(_music_player):
 		print("[music-expansion] force_track: music player non disponibile (non sei in gameplay?).")
 		return
 	_cancel_tween()
 	_music_player.stop()
-	_play_now(stream)
-	_force_stream = null
+	_play_now(stream, display_name, source, "forced")
+	_clear_queued_force()
 
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 	if zone_key == "current":
@@ -159,10 +168,10 @@ func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 		zone_key,
 		str(entry.get("display", "traccia"))
 	])
-	force_track(stream)
+	force_track(stream, str(entry.get("display", "traccia")), str(entry.get("source", "")))
 
 func clear_force() -> void:
-	_force_stream = null
+	_clear_queued_force()
 
 # ── Interno ────────────────────────────────────────────────────────────────────
 
@@ -239,13 +248,36 @@ func _select_pool_entry(zone_key: String, pool: Array) -> Dictionary:
 		return pool[index]
 	return pool[randi() % pool.size()]
 
-func _play_now(stream: AudioStream) -> void:
+func _play_now(stream: AudioStream, display_name: String = "", source: String = "", zone_key: String = "") -> void:
 	_cancel_tween()
 	_music_player.stream = stream
 	_music_player.volume_db = volume_db_offset if _library.is_our_stream(stream) else 0.0
 	_music_player.play()
+	_current_track_info = {
+		"display": _fallback_display_name(stream, display_name),
+		"source": _fallback_source(stream, source),
+		"zone": zone_key,
+	}
 
 func _cancel_tween() -> void:
 	if _force_tween != null and is_instance_valid(_force_tween):
 		_force_tween.kill()
 	_force_tween = null
+
+func _clear_queued_force() -> void:
+	_force_stream = null
+	_force_display = ""
+	_force_source = "mod"
+
+func _fallback_display_name(stream: AudioStream, display_name: String) -> String:
+	if not display_name.is_empty():
+		return display_name
+	var library_name: String = _library.get_display_name_for_stream(stream)
+	if not library_name.is_empty():
+		return library_name
+	return "Unknown track"
+
+func _fallback_source(stream: AudioStream, source: String) -> String:
+	if not source.is_empty():
+		return source
+	return "mod" if _library.is_our_stream(stream) else "vanilla"

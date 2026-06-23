@@ -37,6 +37,8 @@ var track_entries_by_zone: Dictionary = {}
 var tracks_menu: Array = []
 # display_name -> AudioStream (per il dropdown MCM)
 var all_tracks: Dictionary = {}
+# Instance ID stream -> display_name, per overlay/debug.
+var display_by_stream_id: Dictionary = {}
 # Ordine stabile dei display name usati dai dropdown MCM.
 var display_names: Array = []
 # Lista flat di tutti gli stream "nostri" (per identificarli nel MusicInjector)
@@ -47,6 +49,7 @@ func scan() -> void:
 	track_entries_by_zone.clear()
 	tracks_menu.clear()
 	all_tracks.clear()
+	display_by_stream_id.clear()
 	display_names.clear()
 	our_streams.clear()
 
@@ -120,6 +123,11 @@ func get_display_names() -> Array:
 func get_stream_by_name(display_name: String) -> AudioStream:
 	return all_tracks.get(display_name, null)
 
+func get_display_name_for_stream(stream: AudioStream) -> String:
+	if stream == null:
+		return ""
+	return str(display_by_stream_id.get(stream.get_instance_id(), ""))
+
 func get_zone_label(zone_key: String) -> String:
 	return ZONE_LABELS.get(zone_key, zone_key)
 
@@ -148,6 +156,7 @@ func describe_zone_index(zone_key: String, index_zero_based: int) -> String:
 
 func _register_track(display_name: String, stream: AudioStream) -> void:
 	all_tracks[display_name] = stream
+	display_by_stream_id[stream.get_instance_id()] = display_name
 	display_names.append(display_name)
 
 func _make_entry(zone_key: String, file_name: String, display: String, stream: AudioStream) -> Dictionary:

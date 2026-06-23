@@ -9,6 +9,8 @@ extends RefCounted
 #  - Dropdown "force_track" -- forza un brano specifico (debug)
 #  - Dropdown "test_area"   -- area da usare per il ciclo manuale
 #  - Int "cycle_area_track" -- indice 1-based del pool vanilla+mod dell'area
+#  - Bool "debug_overlay_enabled" -- mostra traccia corrente su schermo
+#  - Dropdown "debug_overlay_position" -- posizione overlay debug
 #  - Float "track_volume_db" -- offset volume tracce mod
 
 const MOD_ID         := "music-expansion"
@@ -25,6 +27,12 @@ const SELECTION_CYCLE := "cycle"
 const SELECTION_OPTIONS := {
 	SELECTION_RANDOM: "Random",
 	SELECTION_CYCLE: "Cycle",
+}
+const OVERLAY_TOP_LEFT := "top_left"
+const OVERLAY_TOP_RIGHT := "top_right"
+const OVERLAY_POSITION_OPTIONS := {
+	OVERLAY_TOP_LEFT: "Alto sinistra",
+	OVERLAY_TOP_RIGHT: "Alto destra",
 }
 const AREA_CURRENT      := "current"
 const AREA_LABEL_CURRENT := "Current Area"
@@ -49,6 +57,8 @@ var volume_db: float = DEFAULT_VOLUME_DB
 var selection_mode: String = SELECTION_RANDOM
 var test_area_key: String = AREA_CURRENT
 var cycle_track_number: int = 1
+var debug_overlay_enabled: bool = false
+var debug_overlay_position: String = OVERLAY_TOP_RIGHT
 
 var _mcm_helpers = null
 var _on_update: Callable
@@ -130,6 +140,16 @@ func _on_cycle_area_track_changed(_value_id: String, new_value, _menu) -> void:
 	cycle_track_number = max(1, int(new_value))
 	_apply_cycle_now()
 
+func _on_debug_overlay_enabled_changed(_value_id: String, new_value, _menu) -> void:
+	debug_overlay_enabled = bool(new_value)
+	if _on_update.is_valid():
+		_on_update.call()
+
+func _on_debug_overlay_position_changed(_value_id: String, new_value, _menu) -> void:
+	debug_overlay_position = _resolve_debug_overlay_position(new_value)
+	if _on_update.is_valid():
+		_on_update.call()
+
 func _apply_config(config: ConfigFile) -> void:
 	enabled   = bool(_cfg(config, "Bool",  "enabled",         DEFAULT_ENABLED))
 	paused    = bool(_cfg(config, "Bool",  "paused",          DEFAULT_PAUSED))
@@ -137,6 +157,8 @@ func _apply_config(config: ConfigFile) -> void:
 	selection_mode = _resolve_selection_mode(_cfg(config, "Dropdown", "selection_mode", SELECTION_RANDOM))
 	test_area_key = _resolve_area_key(_cfg(config, "Dropdown", "test_area", AREA_LABEL_CURRENT))
 	cycle_track_number = max(1, int(_cfg(config, "Int", "cycle_area_track", 1)))
+	debug_overlay_enabled = bool(_cfg(config, "Bool", "debug_overlay_enabled", false))
+	debug_overlay_position = _resolve_debug_overlay_position(_cfg(config, "Dropdown", "debug_overlay_position", OVERLAY_TOP_RIGHT))
 
 	# Applica forza brano se salvata
 	if _injector != null:
@@ -209,6 +231,23 @@ func _build_default_config() -> ConfigFile:
 		"on_value_changed": "_on_cycle_area_track_changed",
 		"menu_pos": 6,
 	})
+	c.set_value("Bool", "debug_overlay_enabled", {
+		"name":    "Overlay debug musica",
+		"tooltip": "Mostra a schermo il brano corrente e se arriva dal gioco base o dalla mod.",
+		"default": false,
+		"value":   false,
+		"on_value_changed": "_on_debug_overlay_enabled_changed",
+		"menu_pos": 7,
+	})
+	c.set_value("Dropdown", "debug_overlay_position", {
+		"name":    "Posizione overlay debug",
+		"tooltip": "Scegli dove mostrare il testo di debug della musica.",
+		"default": OVERLAY_TOP_RIGHT,
+		"value":   OVERLAY_TOP_RIGHT,
+		"options": OVERLAY_POSITION_OPTIONS,
+		"on_value_changed": "_on_debug_overlay_position_changed",
+		"menu_pos": 8,
+	})
 	c.set_value("Float", "track_volume_db", {
 		"name":     "Volume tracce mod (dB)",
 		"tooltip":  "Offset volume delle tracce aggiunte. 0 = stesso livello delle tracce vanilla.",
@@ -217,7 +256,7 @@ func _build_default_config() -> ConfigFile:
 		"minRange": -24.0,
 		"maxRange": 6.0,
 		"step":     1.0,
-		"menu_pos": 7,
+		"menu_pos": 9,
 	})
 
 	return c
@@ -255,6 +294,12 @@ func _resolve_selection_mode(value) -> String:
 	if key == SELECTION_CYCLE:
 		return SELECTION_CYCLE
 	return SELECTION_RANDOM
+
+func _resolve_debug_overlay_position(value) -> String:
+	var key := _resolve_dropdown_key(value, OVERLAY_POSITION_OPTIONS)
+	if key == OVERLAY_TOP_LEFT:
+		return OVERLAY_TOP_LEFT
+	return OVERLAY_TOP_RIGHT
 
 func _resolve_dropdown_label(value, options: Array) -> String:
 	if value is int:
@@ -306,6 +351,7 @@ func _refresh_dynamic_config(config: ConfigFile) -> bool:
 	var changed := false
 	changed = _set_config_entry_value(config, "Dropdown", "force_track", "options", _force_track_options()) or changed
 	changed = _set_config_entry_value(config, "Dropdown", "selection_mode", "options", SELECTION_OPTIONS) or changed
+	changed = _set_config_entry_value(config, "Dropdown", "debug_overlay_position", "options", OVERLAY_POSITION_OPTIONS) or changed
 	changed = _set_config_entry_value(config, "Dropdown", "test_area", "options", AREA_OPTIONS) or changed
 	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "maxRange", _max_cycle_range()) or changed
 	return changed

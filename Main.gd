@@ -10,6 +10,7 @@ extends Node
 #   TrackLibrary  -- scansiona e carica le tracce a runtime
 #   MusicInjector -- inietta le tracce negli array zona di Audio.gd
 #   MenuMusic     -- randomizza la traccia del menu
+#   DebugOverlay  -- mostra a schermo il brano corrente quando abilitato
 #   Config        -- MCM (toggle, force brano, volume)
 
 const MOD_ID := "music-expansion"
@@ -17,12 +18,14 @@ const MOD_ID := "music-expansion"
 const _TrackLibraryScript  := preload("res://MusicExpansion/TrackLibrary.gd")
 const _MusicInjectorScript := preload("res://MusicExpansion/MusicInjector.gd")
 const _MenuMusicScript     := preload("res://MusicExpansion/MenuMusic.gd")
+const _DebugOverlayScript  := preload("res://MusicExpansion/DebugOverlay.gd")
 const _ConfigScript        := preload("res://MusicExpansion/Config.gd")
 
 var _lib          = null
 var _library      = null
 var _injector     = null
 var _menu_music   = null
+var _debug_overlay = null
 var _config       = null
 
 # ── Bootstrap ──────────────────────────────────────────────────────────────────
@@ -49,6 +52,10 @@ func _initialize() -> void:
 	_menu_music = _MenuMusicScript.new()
 	_menu_music.setup(_library, self)
 
+	_debug_overlay = _DebugOverlayScript.new()
+	add_child(_debug_overlay)
+	_debug_overlay.setup(_injector)
+
 	# 3. Registra MCM e carica la config (deve avvenire dopo _injector, per force_track)
 	_config = _ConfigScript.new()
 	_config.setup(_library, _injector, _on_config_updated)
@@ -58,6 +65,8 @@ func _initialize() -> void:
 	_injector.set_paused(_config.paused)
 	_injector.set_volume(_config.volume_db)
 	_injector.set_selection_mode(_config.selection_mode)
+	_debug_overlay.set_enabled(_config.debug_overlay_enabled)
+	_debug_overlay.set_position(_config.debug_overlay_position)
 
 	print("[%s] caricata. enabled=%s, tracce totali=%d" % [
 		MOD_ID, _config.enabled, _library.all_tracks.size()
@@ -80,6 +89,7 @@ func _physics_process(_delta: float) -> void:
 	# Menu: throttled, non critico
 	if Engine.get_physics_frames() % 20 == 0:
 		_menu_music.tick()
+		_debug_overlay.tick()
 
 # ── Callback cambio config (MCM) ──────────────────────────────────────────────
 
@@ -90,3 +100,6 @@ func _on_config_updated() -> void:
 	_injector.set_paused(_config.paused)
 	_injector.set_volume(_config.volume_db)
 	_injector.set_selection_mode(_config.selection_mode)
+	if _debug_overlay != null:
+		_debug_overlay.set_enabled(_config.debug_overlay_enabled)
+		_debug_overlay.set_position(_config.debug_overlay_position)
