@@ -1,7 +1,7 @@
 [mod]
 name="Music Expansion"
 id="music-expansion"
-version="0.3.6"
+version="0.3.7"
 priority=1
 
 [autoload]

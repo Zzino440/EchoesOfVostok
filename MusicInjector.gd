@@ -73,10 +73,15 @@ func tick() -> void:
 	if _music_player == null or not is_instance_valid(_music_player):
 		return
 
-	# --- Pausa/Riprendi dal mod menu ---
-	if paused or not enabled:
+	# --- Pausa esplicita dal mod menu: silenzia davvero la musica ---
+	if paused:
 		if _music_player.volume_db != -80.0:
 			_music_player.volume_db = -80.0
+		return
+
+	# --- Mod disabilitata: rilascia il player alla logica vanilla ---
+	if not enabled:
+		_release_to_vanilla()
 		return
 
 	# --- Ripristina volume se non c'e' tween attivo ---
@@ -157,8 +162,8 @@ func get_zone_pool_count(zone_key: String) -> int:
 
 func set_enabled(v: bool) -> void:
 	enabled = v
-	if not v and _music_player != null and is_instance_valid(_music_player):
-		_music_player.volume_db = 0.0
+	if not v:
+		_release_to_vanilla()
 
 func set_paused(v: bool) -> void:
 	paused = v
@@ -337,6 +342,17 @@ func _clear_queued_force() -> void:
 	_force_zone = "forced"
 	_force_track_index = 0
 	_force_pool_count = 0
+
+func _release_to_vanilla() -> void:
+	_cancel_tween()
+	_clear_queued_force()
+	_current_track_info.clear()
+	if _music_player == null or not is_instance_valid(_music_player):
+		return
+	_music_player.volume_db = 0.0
+	var stream: AudioStream = _music_player.stream
+	if stream != null and _library != null and _library.is_our_stream(stream):
+		_music_player.stop()
 
 func _fallback_display_name(stream: AudioStream, display_name: String) -> String:
 	if not display_name.is_empty():
