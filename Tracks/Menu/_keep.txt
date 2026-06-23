@@ -1,0 +1,4 @@
+Inserisci qui i file audio da aggiungere al pool della musica del menu iniziale.
+Vengono caricati automaticamente all'avvio del gioco.
+Formati supportati: .mp3, .ogg
+La traccia vanilla "Far" e' sempre inclusa nel pool.

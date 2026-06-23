@@ -1,0 +1,8 @@
+[mod]
+name="Music Expansion"
+id="music-expansion"
+version="0.2.0"
+priority=1
+
+[autoload]
+MusicExpansion="res://MusicExpansion/Main.gd"

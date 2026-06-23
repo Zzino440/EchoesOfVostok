@@ -1,0 +1,3 @@
+Inserisci qui i file .mp3 da suonare nella zona Border Zone.
+Vengono caricati automaticamente all'avvio del gioco.
+Formato supportato: .mp3
