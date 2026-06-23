@@ -41,6 +41,8 @@ var _force_stream: AudioStream    = null
 var _force_display: String        = ""
 var _force_source: String         = "mod"
 var _force_zone: String           = "forced"
+var _force_track_index: int       = 0
+var _force_pool_count: int        = 0
 var _force_tween: Tween           = null
 var _cycle_indices_by_zone: Dictionary = {}
 var _current_track_info: Dictionary = {}
@@ -97,7 +99,7 @@ func tick() -> void:
 
 	# Force esplicito da MCM: ha priorita' assoluta
 	if _force_stream != null:
-		_play_now(_force_stream, _force_display, _force_source, _force_zone)
+		_play_now(_force_stream, _force_display, _force_source, _force_zone, _force_track_index, _force_pool_count)
 		print("[music-expansion] Force: traccia avviata.")
 		_clear_queued_force()
 		return
@@ -114,7 +116,14 @@ func tick() -> void:
 	var stream: AudioStream = chosen.get("stream", null)
 	if stream == null:
 		return
-	_play_now(stream, str(chosen.get("display", "traccia")), str(chosen.get("source", "")), zone_key)
+	_play_now(
+		stream,
+		str(chosen.get("display", "traccia")),
+		str(chosen.get("source", "")),
+		zone_key,
+		int(chosen.get("track_index", 0)),
+		int(chosen.get("pool_count", 0))
+	)
 	print("[music-expansion] Zona '%s': avviata %s." % [
 		zone_key,
 		str(chosen.get("display", "traccia"))
@@ -163,18 +172,27 @@ func set_selection_mode(mode: String) -> void:
 	selection_mode = SELECTION_CYCLE if mode == SELECTION_CYCLE else SELECTION_RANDOM
 
 # Forza la riproduzione di uno stream con fade out ~1s poi play.
-func force_track(stream: AudioStream, display_name: String = "", source: String = "mod", zone_key: String = "forced") -> void:
+func force_track(
+	stream: AudioStream,
+	display_name: String = "",
+	source: String = "mod",
+	zone_key: String = "forced",
+	track_index: int = 0,
+	pool_count: int = 0
+) -> void:
 	print("[music-expansion] force_track richiesto.")
 	_force_stream = stream
 	_force_display = display_name
 	_force_source = source
 	_force_zone = zone_key
+	_force_track_index = track_index
+	_force_pool_count = pool_count
 	if _music_player == null or not is_instance_valid(_music_player):
 		print("[music-expansion] force_track: music player non disponibile (non sei in gameplay?).")
 		return
 	_cancel_tween()
 	_music_player.stop()
-	_play_now(stream, display_name, source, zone_key)
+	_play_now(stream, display_name, source, zone_key, track_index, pool_count)
 	_clear_queued_force()
 
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
@@ -196,7 +214,14 @@ func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 		resolved_zone,
 		str(entry.get("display", "traccia"))
 	])
-	force_track(stream, str(entry.get("display", "traccia")), str(entry.get("source", "")), resolved_zone)
+	force_track(
+		stream,
+		str(entry.get("display", "traccia")),
+		str(entry.get("source", "")),
+		resolved_zone,
+		safe_index + 1,
+		pool.size()
+	)
 
 func clear_force() -> void:
 	_clear_queued_force()
@@ -266,14 +291,27 @@ func _pool_has_stream(pool: Array, stream: AudioStream) -> bool:
 	return false
 
 func _select_pool_entry(zone_key: String, pool: Array) -> Dictionary:
+	var selected_index := 0
 	if selection_mode == SELECTION_CYCLE:
 		var index := int(_cycle_indices_by_zone.get(zone_key, 0))
 		index = posmod(index, pool.size())
 		_cycle_indices_by_zone[zone_key] = index + 1
-		return pool[index]
-	return pool[randi() % pool.size()]
+		selected_index = index
+	else:
+		selected_index = randi() % pool.size()
+	var selected: Dictionary = pool[selected_index].duplicate()
+	selected["track_index"] = selected_index + 1
+	selected["pool_count"] = pool.size()
+	return selected
 
-func _play_now(stream: AudioStream, display_name: String = "", source: String = "", zone_key: String = "") -> void:
+func _play_now(
+	stream: AudioStream,
+	display_name: String = "",
+	source: String = "",
+	zone_key: String = "",
+	track_index: int = 0,
+	pool_count: int = 0
+) -> void:
 	_cancel_tween()
 	_music_player.stream = stream
 	_music_player.volume_db = volume_db_offset if _library.is_our_stream(stream) else 0.0
@@ -282,6 +320,8 @@ func _play_now(stream: AudioStream, display_name: String = "", source: String = 
 		"display": _fallback_display_name(stream, display_name),
 		"source": _fallback_source(stream, source),
 		"zone": zone_key,
+		"track_index": track_index,
+		"pool_count": pool_count,
 		"stream_id": stream.get_instance_id(),
 	}
 
@@ -295,6 +335,8 @@ func _clear_queued_force() -> void:
 	_force_display = ""
 	_force_source = "mod"
 	_force_zone = "forced"
+	_force_track_index = 0
+	_force_pool_count = 0
 
 func _fallback_display_name(stream: AudioStream, display_name: String) -> String:
 	if not display_name.is_empty():
@@ -317,13 +359,16 @@ func _build_track_info_for_stream(stream: AudioStream) -> Dictionary:
 	var pool: Array = []
 	if not zone_key.is_empty():
 		pool = _build_zone_pool(zone_key)
-		for raw_entry in pool:
+		for i in range(pool.size()):
+			var raw_entry = pool[i]
 			var entry: Dictionary = raw_entry
 			if entry.get("stream", null) == stream:
 				return {
 					"display": str(entry.get("display", "Unknown track")),
 					"source": str(entry.get("source", _fallback_source(stream, ""))),
 					"zone": zone_key,
+					"track_index": i + 1,
+					"pool_count": pool.size(),
 					"stream_id": stream.get_instance_id(),
 				}
 
@@ -333,6 +378,8 @@ func _build_track_info_for_stream(stream: AudioStream) -> Dictionary:
 		"display": display,
 		"source": source,
 		"zone": zone_key,
+		"track_index": 0,
+		"pool_count": 0,
 		"stream_id": stream.get_instance_id(),
 	}
 

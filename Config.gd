@@ -56,6 +56,7 @@ var paused: bool     = DEFAULT_PAUSED
 var volume_db: float = DEFAULT_VOLUME_DB
 var selection_mode: String = SELECTION_RANDOM
 var test_area_key: String = AREA_CURRENT
+var cycle_area_key: String = AREA_CURRENT
 var cycle_track_number: int = 1
 var debug_overlay_enabled: bool = false
 var debug_overlay_position: String = OVERLAY_TOP_RIGHT
@@ -139,12 +140,12 @@ func _on_selection_mode_changed(_value_id: String, new_value, _menu) -> void:
 
 func _on_test_area_changed(_value_id: String, new_value, menu) -> void:
 	test_area_key = _resolve_area_key(new_value)
-	_last_resolved_cycle_zone = _resolved_cycle_zone_for(test_area_key)
+	_update_cycle_area_from_selection()
 	_sync_cycle_range_in_menu(menu)
 	_apply_cycle_now()
 
 func _on_cycle_area_track_changed(_value_id: String, new_value, _menu) -> void:
-	cycle_track_number = _clamp_cycle_track_number(int(new_value), test_area_key)
+	cycle_track_number = _clamp_cycle_track_number(int(new_value), cycle_area_key)
 	_apply_cycle_now()
 
 func _on_debug_overlay_enabled_changed(_value_id: String, new_value, _menu) -> void:
@@ -161,9 +162,16 @@ func refresh_current_area_range(menu = null) -> void:
 	if _injector == null or test_area_key != AREA_CURRENT:
 		return
 	var resolved_zone := _resolved_cycle_zone_for(AREA_CURRENT)
-	if resolved_zone.is_empty() or resolved_zone == _last_resolved_cycle_zone:
+	if resolved_zone.is_empty() or resolved_zone == cycle_area_key:
 		return
-	_last_resolved_cycle_zone = resolved_zone
+	cycle_area_key = resolved_zone
+	_last_resolved_cycle_zone = cycle_area_key
+	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, cycle_area_key)
+	print("[music-expansion] Current Area aggiornata: zona=%s pool=%d" % [
+		cycle_area_key,
+		_cycle_range_for_area(cycle_area_key),
+	])
+	_save_cycle_range_to_disk()
 	_sync_cycle_range_in_menu(_cycle_menu_or_stored(menu))
 
 func _apply_config(config: ConfigFile) -> void:
@@ -172,8 +180,8 @@ func _apply_config(config: ConfigFile) -> void:
 	volume_db = float(_cfg(config, "Float", "track_volume_db", DEFAULT_VOLUME_DB))
 	selection_mode = _resolve_selection_mode(_cfg(config, "Dropdown", "selection_mode", SELECTION_RANDOM))
 	test_area_key = _resolve_area_key(_cfg(config, "Dropdown", "test_area", AREA_LABEL_CURRENT))
-	cycle_track_number = _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), test_area_key)
-	_last_resolved_cycle_zone = _resolved_cycle_zone_for(test_area_key)
+	_update_cycle_area_from_selection()
+	cycle_track_number = _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), cycle_area_key)
 	debug_overlay_enabled = bool(_cfg(config, "Bool", "debug_overlay_enabled", false))
 	debug_overlay_position = _resolve_debug_overlay_position(_cfg(config, "Dropdown", "debug_overlay_position", OVERLAY_TOP_RIGHT))
 
@@ -239,7 +247,7 @@ func _build_default_config() -> ConfigFile:
 	})
 	c.set_value("Int", "cycle_area_track", {
 		"name":     "Ciclo tracce area",
-		"tooltip":  "Numero della traccia nel pool vanilla+mod dell'area selezionata. Se superi il totale, ricomincia da capo.",
+		"tooltip":  "Numero della traccia nel pool vanilla+mod della zona effettiva. Con Current Area il range reale segue la mappa corrente; l'overlay mostra Pool: indice/totale.",
 		"default":  1,
 		"value":    1,
 		"minRange": 1,
@@ -291,7 +299,7 @@ func _force_track_options() -> Array:
 	return options
 
 func _max_cycle_range() -> int:
-	return _cycle_range_for_area(test_area_key)
+	return _cycle_range_for_area(cycle_area_key)
 
 func _cycle_range_for_area(area_key: String) -> int:
 	var count := 0
@@ -312,6 +320,14 @@ func _resolved_cycle_zone_for(area_key: String) -> String:
 	if _injector == null:
 		return ""
 	return _injector.get_resolved_zone_key(area_key)
+
+func _update_cycle_area_from_selection() -> void:
+	var resolved_zone := _resolved_cycle_zone_for(test_area_key)
+	if resolved_zone.is_empty():
+		cycle_area_key = test_area_key
+	else:
+		cycle_area_key = resolved_zone
+	_last_resolved_cycle_zone = cycle_area_key
 
 func _is_force_off(value) -> bool:
 	return _resolve_dropdown_label(value, _force_track_options()) == FORCE_OFF_LABEL
@@ -378,12 +394,12 @@ func _apply_cycle_if_changed() -> void:
 func _apply_cycle_now() -> void:
 	if _injector == null:
 		return
-	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, test_area_key)
+	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, cycle_area_key)
 	_last_cycle_signature = _cycle_signature()
-	_injector.force_zone_track(test_area_key, cycle_track_number - 1)
+	_injector.force_zone_track(cycle_area_key, cycle_track_number - 1)
 
 func _cycle_signature() -> String:
-	return "%s:%d" % [test_area_key, cycle_track_number]
+	return "%s:%d" % [cycle_area_key, cycle_track_number]
 
 func _refresh_dynamic_config(config: ConfigFile) -> bool:
 	var changed := false
@@ -392,11 +408,18 @@ func _refresh_dynamic_config(config: ConfigFile) -> bool:
 	changed = _set_config_entry_value(config, "Dropdown", "debug_overlay_position", "options", OVERLAY_POSITION_OPTIONS) or changed
 	changed = _set_config_entry_value(config, "Dropdown", "test_area", "options", AREA_OPTIONS) or changed
 	var area_key := _resolve_area_key(_cfg(config, "Dropdown", "test_area", AREA_LABEL_CURRENT))
-	var max_range := _cycle_range_for_area(area_key)
+	var cycle_key := _cycle_area_for_config_selection(area_key)
+	var max_range := _cycle_range_for_area(cycle_key)
 	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "maxRange", max_range) or changed
-	var cycle_value := _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), area_key)
+	var cycle_value := _clamp_cycle_track_number(int(_cfg(config, "Int", "cycle_area_track", 1)), cycle_key)
 	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "value", cycle_value) or changed
 	return changed
+
+func _cycle_area_for_config_selection(area_key: String) -> String:
+	if _injector == null:
+		return area_key
+	var resolved_zone: String = _injector.get_resolved_zone_key(area_key)
+	return area_key if resolved_zone.is_empty() else resolved_zone
 
 func _set_config_entry_value(config: ConfigFile, section: String, key: String, entry_key: String, value) -> bool:
 	var entry = config.get_value(section, key, null)
@@ -411,8 +434,8 @@ func _set_config_entry_value(config: ConfigFile, section: String, key: String, e
 func _sync_cycle_range_in_menu(menu) -> void:
 	const MIN_RANGE := 1
 	var active_menu = _cycle_menu_or_stored(menu)
-	var max_range := _cycle_range_for_area(test_area_key)
-	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, test_area_key)
+	var max_range := _cycle_range_for_area(cycle_area_key)
+	cycle_track_number = _clamp_cycle_track_number(cycle_track_number, cycle_area_key)
 	if active_menu == null or not active_menu.has_method("GetElements"):
 		return
 	var elements: Dictionary = active_menu.GetElements()
@@ -421,14 +444,29 @@ func _sync_cycle_range_in_menu(menu) -> void:
 	var element = elements["cycle_area_track"]
 	if element == null:
 		return
-	var value_data = element.get("valueData")
+	var value_data = element.GetValueData() if element.has_method("GetValueData") else element.get("valueData")
 	if value_data is Dictionary:
 		value_data["minRange"] = MIN_RANGE
 		value_data["maxRange"] = max_range
+		value_data["value"] = cycle_track_number
 	if element is Node:
 		_sync_range_nodes(element as Node, MIN_RANGE, max_range, cycle_track_number)
 	if element.has_method("SetValue"):
 		element.SetValue(cycle_track_number)
+
+func _save_cycle_range_to_disk() -> void:
+	var ini_path := MCM_FILE_PATH + "/config.ini"
+	if not FileAccess.file_exists(ini_path):
+		return
+	var config := ConfigFile.new()
+	if config.load(ini_path) != OK:
+		return
+	var max_range := _cycle_range_for_area(cycle_area_key)
+	var changed := false
+	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "maxRange", max_range) or changed
+	changed = _set_config_entry_value(config, "Int", "cycle_area_track", "value", cycle_track_number) or changed
+	if changed:
+		config.save(ini_path)
 
 func _cycle_menu_or_stored(menu):
 	if menu != null and menu.has_method("GetElements"):

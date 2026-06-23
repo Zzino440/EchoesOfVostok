@@ -55,36 +55,40 @@ func tick() -> void:
 func _format_info(info: Dictionary) -> String:
 	if info.is_empty():
 		return "MusicExpansion\nWAITING\nNo active gameplay track"
-	var source := str(info.get("source", "unknown"))
-	var source_label := "CUSTOM" if source == "mod" else "VANILLA"
-	var display := str(info.get("display", "Unknown track"))
-	var zone := str(info.get("zone", ""))
-	var zone_label := ZONE_LABELS.get(zone, zone)
+	var source: String = str(info.get("source", "unknown"))
+	var source_label: String = "CUSTOM" if source == "mod" else "VANILLA"
+	var display: String = str(info.get("display", "Unknown track"))
+	var zone: String = str(info.get("zone", ""))
+	var zone_label: String = str(ZONE_LABELS.get(zone, zone))
 	if zone_label.is_empty():
 		zone_label = "Unknown"
-	return "MusicExpansion\n%s\nTrack: %s\nZone: %s" % [
+	var track_index: int = int(info.get("track_index", 0))
+	var pool_count: int = int(info.get("pool_count", 0))
+	var pool_label: String = "%d/%d" % [track_index, pool_count] if pool_count > 0 else "Unknown"
+	return "MusicExpansion\n%s\nTrack: %s\nZone: %s\nPool: %s" % [
 		source_label,
 		display,
 		zone_label,
+		pool_label,
 	]
 
 func _apply_position() -> void:
 	if _label == null:
 		return
-	_label.size = Vector2(620, 118)
-	_label.custom_minimum_size = Vector2(420, 104)
+	_label.size = Vector2(620, 140)
+	_label.custom_minimum_size = Vector2(420, 126)
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	if position == POSITION_TOP_LEFT:
 		_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_label.offset_left = 18
 		_label.offset_top = 16
 		_label.offset_right = 638
-		_label.offset_bottom = 134
+		_label.offset_bottom = 156
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	else:
 		_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 		_label.offset_left = -638
 		_label.offset_top = 16
 		_label.offset_right = -18
-		_label.offset_bottom = 134
+		_label.offset_bottom = 156
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
