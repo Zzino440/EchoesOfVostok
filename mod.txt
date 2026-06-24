@@ -1,7 +1,7 @@
 [mod]
 name="Echoes Of Vostok"
 id="echoes-of-vostok"
-version="0.3.10"
+version="0.3.11"
 priority=1
 
 [autoload]

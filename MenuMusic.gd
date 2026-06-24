@@ -1,20 +1,29 @@
 extends RefCounted
 
-# Randomises the main menu track by choosing from:
-#  - Tracks in Tracks/Menu/ (mp3/ogg)
-#  - Vanilla track "Far" (always included in the pool so it is never excluded)
+# Gestisce la musica del menu principale con rotazione random continua.
 #
-# The logic fires once per entry into the menu scene
-# and respects the user's "Menu Music" off preference (stream_paused).
+# Pool: tracce in Tracks/Menu/ (mp3/ogg) + vanilla "Far" (sempre inclusa).
+# Quando una traccia finisce ne parte automaticamente un'altra diversa (no-repeat).
+# Rispetta il toggle "Menu Music off" del gioco (stream_paused).
+#
+# La risorsa vanilla (loop=true nell'import) non viene mai modificata:
+# ne creiamo una copia con loop=false, memorizzata in _loopless_cache
+# per evitare riallocazioni a ogni rotazione.
 
 const MENU_DEFAULT_PATH := "res://Audio/Music/Road_to_Vostok_OST_Far.mp3"
 
 var _library = null
 var _parent_node: Node = null
-var _handled_scene: Node = null  # menu scene already randomised in this session
+
+# Stato corrente
+var _menu_audio: AudioStreamPlayer = null  # nodo Audio del menu
+var _vanilla_stream: AudioStream   = null  # stream originale catturato all'ingresso (Far)
+var _last_stream: AudioStream      = null  # stream originale dell'ultima traccia avviata
+var _started_once: bool            = false # true dopo la prima _play_random() in questa scena
+var _loopless_cache: Dictionary    = {}    # instance_id(originale) -> copia con loop=false
 
 func setup(library, parent_node: Node) -> void:
-	_library = library
+	_library     = library
 	_parent_node = parent_node
 
 func tick() -> void:
@@ -22,54 +31,107 @@ func tick() -> void:
 	if scene == null:
 		return
 
-	# Reset if the scene has changed
-	if scene != _handled_scene and _handled_scene != null:
-		print("[echoes-of-vostok] Menu: scene changed (%s), reset." % scene.name)
-		_handled_scene = null
-
-	# Already handled for this scene
-	if _handled_scene != null:
+	# Siamo nel gameplay? Usciamo e resettiamo
+	if _parent_node.get_tree().root.get_node_or_null("Map/Core") != null:
+		if _menu_audio != null:
+			_reset_state()
 		return
 
-	# Look for the Audio node as a direct child of the root (must be AudioStreamPlayer)
+	# Il menu ha un AudioStreamPlayer diretto figlio chiamato "Audio"
 	var audio := scene.get_node_or_null("Audio") as AudioStreamPlayer
 	if audio == null:
-		# No AudioStreamPlayer named "Audio" in this scene (we are in gameplay)
+		if _menu_audio != null:
+			_reset_state()
 		return
 
-	# Make sure we are not in gameplay (gameplay has /root/Map/Core)
-	if _parent_node.get_tree().root.get_node_or_null("Map/Core") != null:
+	# Nuova scena menu: catturiamo lo stream vanilla e resettiamo il contesto
+	if audio != _menu_audio:
+		_menu_audio     = audio
+		_vanilla_stream = audio.stream
+		_started_once   = false
+		_last_stream    = null
+		print("[echoes-of-vostok] Menu: nodo Audio rilevato su '%s'." % scene.name)
+
+	# Rispettiamo il toggle "Menu Music off" (stream_paused = true -> nessun avvio)
+	if audio.stream_paused:
 		return
 
-	print("[echoes-of-vostok] Menu: Audio node found on scene '%s', stream_paused=%s" % [
-		scene.name, str(audio.stream_paused)
-	])
+	# Prima traccia o traccia finita -> ne avviamo un'altra
+	if not _started_once or not audio.is_playing():
+		_play_random(audio)
 
-	# --- We are in the menu: randomise the stream ---
+# ── Internals ─────────────────────────────────────────────────────────────────
+
+func _reset_state() -> void:
+	_menu_audio     = null
+	_vanilla_stream = null
+	_last_stream    = null
+	_started_once   = false
+
+func _build_pool() -> Array:
 	var pool: Array = []
 
-	# First choice: tracks from Tracks/Menu/ (if any)
+	# 1. Tracce dalla cartella Tracks/Menu/
 	for s in _library.tracks_menu:
 		pool.append(s)
 
-	# If there are no mod tracks, also add Far as a fallback
-	# (so with the Daybreak test seed it is always chosen)
-	if pool.is_empty() and ResourceLoader.exists(MENU_DEFAULT_PATH):
-		pool.append(load(MENU_DEFAULT_PATH))
+	# 2. Vanilla "Far" -- sempre nel pool
+	var vanilla: AudioStream = _vanilla_stream
+	if vanilla == null and ResourceLoader.exists(MENU_DEFAULT_PATH):
+		vanilla = load(MENU_DEFAULT_PATH)
+	if vanilla != null and not pool.has(vanilla):
+		pool.append(vanilla)
 
-	print("[echoes-of-vostok] Menu: pool = %d mod tracks" % pool.size())
+	return pool
 
+func _play_random(audio: AudioStreamPlayer) -> void:
+	var pool: Array = _build_pool()
 	if pool.is_empty():
 		return
 
-	var idx := randi() % pool.size()
-	var chosen: AudioStream = pool[idx]
+	# Selezione random con no-repeat consecutivo
+	var idx: int = randi() % pool.size()
+	if pool.size() > 1 and pool[idx] == _last_stream:
+		idx = (idx + 1) % pool.size()
+
+	var chosen: AudioStream  = pool[idx]
+	var prepared: AudioStream = _prepare_loopless(chosen)
+
 	audio.stop()
-	audio.stream = chosen
+	audio.stream = prepared
+	audio.play()
 
-	# Respect the menuMusic off preference (stream_paused = true means OFF)
-	if not audio.stream_paused:
-		audio.play()
+	_last_stream  = chosen  # tracciamo l'originale, non la copia
+	_started_once = true
 
-	_handled_scene = scene
-	print("[echoes-of-vostok] Menu: track #%d selected and started." % idx)
+	print("[echoes-of-vostok] Menu: traccia %d/%d avviata." % [idx + 1, pool.size()])
+
+func _prepare_loopless(stream: AudioStream) -> AudioStream:
+	# Ritorna lo stream invariato se non ha loop attivo
+	if stream == null:
+		return stream
+
+	var has_loop := false
+	if stream is AudioStreamMP3:
+		has_loop = (stream as AudioStreamMP3).loop
+	elif stream is AudioStreamOggVorbis:
+		has_loop = (stream as AudioStreamOggVorbis).loop
+
+	if not has_loop:
+		return stream
+
+	# Usiamo la cache per non riallocare a ogni rotazione
+	var cache_key: int = stream.get_instance_id()
+	if _loopless_cache.has(cache_key):
+		return _loopless_cache[cache_key]
+
+	# Copia superficiale della risorsa: PackedByteArray e OggPacketSequence
+	# sono copiati per valore da duplicate(), non per riferimento.
+	var copy: AudioStream = stream.duplicate() as AudioStream
+	if copy is AudioStreamMP3:
+		(copy as AudioStreamMP3).loop = false
+	elif copy is AudioStreamOggVorbis:
+		(copy as AudioStreamOggVorbis).loop = false
+
+	_loopless_cache[cache_key] = copy
+	return copy
