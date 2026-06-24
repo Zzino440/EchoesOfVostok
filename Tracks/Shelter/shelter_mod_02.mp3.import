@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://i52fiuyxum4f"
-path="res://.godot/imported/shelter_mod_02.mp3-e28c28b479620429880e72344a5ee07b.mp3str"
+path="res://.godot/imported/shelter_mod_02.mp3-0ba303aec8000a53fbf54ed98fdf1414.mp3str"
 
 [deps]
 
 source_file="res://EchoesOfVostok/Tracks/Shelter/shelter_mod_02.mp3"
-dest_files=["res://.godot/imported/shelter_mod_02.mp3-e28c28b479620429880e72344a5ee07b.mp3str"]
+dest_files=["res://.godot/imported/shelter_mod_02.mp3-0ba303aec8000a53fbf54ed98fdf1414.mp3str"]
 
 [params]
 

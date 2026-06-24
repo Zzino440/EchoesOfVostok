@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://cisehhqikh3hy"
-path="res://.godot/imported/vostok_mod_02.mp3-5590165723d52f46c7add8b29a53f4b8.mp3str"
+path="res://.godot/imported/vostok_mod_02.mp3-a57bcd006606024b340540d7c6285198.mp3str"
 
 [deps]
 
 source_file="res://EchoesOfVostok/Tracks/Vostok/vostok_mod_02.mp3"
-dest_files=["res://.godot/imported/vostok_mod_02.mp3-5590165723d52f46c7add8b29a53f4b8.mp3str"]
+dest_files=["res://.godot/imported/vostok_mod_02.mp3-a57bcd006606024b340540d7c6285198.mp3str"]
 
 [params]
 

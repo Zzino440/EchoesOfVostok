@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://bspd65jn3x6ip"
-path="res://.godot/imported/borderzone_mod_04.mp3-d5364770705391120a12f4d72a5cf3be.mp3str"
+path="res://.godot/imported/borderzone_mod_04.mp3-21ada4907afb2256e332eef53362ac22.mp3str"
 
 [deps]
 
 source_file="res://EchoesOfVostok/Tracks/BorderZone/borderzone_mod_04.mp3"
-dest_files=["res://.godot/imported/borderzone_mod_04.mp3-d5364770705391120a12f4d72a5cf3be.mp3str"]
+dest_files=["res://.godot/imported/borderzone_mod_04.mp3-21ada4907afb2256e332eef53362ac22.mp3str"]
 
 [params]
 

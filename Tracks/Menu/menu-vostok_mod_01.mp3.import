@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://dsv322sqq8ai"
-path="res://.godot/imported/menu-vostok_mod_01.mp3-5180b0220efc29c131cf43aa24d2fc54.mp3str"
+path="res://.godot/imported/menu-vostok_mod_01.mp3-b83278acda296bf959282b43f06e3916.mp3str"
 
 [deps]
 
 source_file="res://EchoesOfVostok/Tracks/Menu/menu-vostok_mod_01.mp3"
-dest_files=["res://.godot/imported/menu-vostok_mod_01.mp3-5180b0220efc29c131cf43aa24d2fc54.mp3str"]
+dest_files=["res://.godot/imported/menu-vostok_mod_01.mp3-b83278acda296bf959282b43f06e3916.mp3str"]
 
 [params]
 
