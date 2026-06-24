@@ -13,9 +13,9 @@ extends RefCounted
 #  - Dropdown "debug_overlay_position" -- debug overlay position
 #  - Float "track_volume_db" -- volume offset for mod tracks
 
-const MOD_ID         := "music-expansion"
-const MCM_MOD_ID     := "MusicExpansion"
-const MCM_FILE_PATH  := "user://MCM/MusicExpansion"
+const MOD_ID         := "echoes-of-vostok"
+const MCM_MOD_ID     := "EchoesOfVostok"
+const MCM_FILE_PATH  := "user://MCM/EchoesOfVostok"
 const MCM_HELPERS_PATH := "res://ModConfigurationMenu/Scripts/Doink Oink/MCM_Helpers.tres"
 
 const DEFAULT_ENABLED   := true
@@ -102,9 +102,9 @@ func setup(library, injector, on_update: Callable) -> void:
 
 	_mcm_helpers.RegisterConfiguration(
 		MCM_MOD_ID,
-		"Music Expansion",
+		"Echoes Of Vostok",
 		MCM_FILE_PATH,
-		"Adds new music tracks to the game zones and the main menu. Drop .mp3 files into MusicExpansion/Tracks/<Zone>/.",
+		"Adds new music tracks to the game zones and the main menu. Drop .mp3 files into EchoesOfVostok/Tracks/<Zone>/.",
 		{"config.ini": _on_mcm_save},
 		self
 	)
@@ -122,14 +122,14 @@ func _on_mcm_save(config: ConfigFile) -> void:
 # Live Dropdown callback: called while the user selects a value in the MCM panel.
 # Required MCM signature: func(value_id, new_value, menu).
 func _on_force_track_changed(value_id: String, new_value, _menu) -> void:
-	print("[music-expansion] MCM dropdown changed: '%s'" % str(new_value))
+	print("[echoes-of-vostok] MCM dropdown changed: '%s'" % str(new_value))
 	if _injector == null:
 		return
 	if _is_force_off(new_value):
 		_injector.clear_force()
 	else:
 		var stream: AudioStream = _resolve_track_stream(new_value)
-		print("[music-expansion] Stream found in library: %s" % ("yes" if stream != null else "NO"))
+		print("[echoes-of-vostok] Stream found in library: %s" % ("yes" if stream != null else "NO"))
 		if stream != null:
 			_injector.force_track(stream)
 
@@ -177,7 +177,7 @@ func refresh_current_area_range(menu = null) -> void:
 			cycle_track_number = _clamp_cycle_track_number(cycle_track_number, cycle_area_key)
 			changed = true
 	if changed:
-		print("[music-expansion] Current Area updated: zone=%s pool=%d track=%d" % [
+		print("[echoes-of-vostok] Current Area updated: zone=%s pool=%d track=%d" % [
 			cycle_area_key,
 			_cycle_range_for_area(cycle_area_key),
 			cycle_track_number,
@@ -199,7 +199,7 @@ func _apply_config(config: ConfigFile) -> void:
 	# Apply forced track if saved
 	if _injector != null:
 		var force_val = _cfg(config, "Dropdown", "force_track", FORCE_OFF_LABEL)
-		print("[music-expansion] _apply_config: enabled=%s paused=%s force='%s'" % [enabled, paused, force_val])
+		print("[echoes-of-vostok] _apply_config: enabled=%s paused=%s force='%s'" % [enabled, paused, force_val])
 		if _is_force_off(force_val):
 			_injector.clear_force()
 		else:
@@ -207,7 +207,7 @@ func _apply_config(config: ConfigFile) -> void:
 			if stream != null:
 				_injector.force_track(stream)
 			else:
-				push_warning("[music-expansion] Track '%s' not found in library." % force_val)
+				push_warning("[echoes-of-vostok] Track '%s' not found in library." % force_val)
 
 func _build_default_config() -> ConfigFile:
 	var c := ConfigFile.new()

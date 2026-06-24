@@ -7,7 +7,7 @@ path="res://.godot/imported/shelter_mod_01.mp3-edd4cdc523dc3dfadf163f26a0d6cac2.
 
 [deps]
 
-source_file="res://MusicExpansion/Tracks/Shelter/shelter_mod_01.mp3"
+source_file="res://EchoesOfVostok/Tracks/Shelter/shelter_mod_01.mp3"
 dest_files=["res://.godot/imported/shelter_mod_01.mp3-edd4cdc523dc3dfadf163f26a0d6cac2.mp3str"]
 
 [params]

@@ -7,7 +7,7 @@ path="res://.godot/imported/borderzone_mod_03.mp3-3ba16489c558a0168f66b126a66b13
 
 [deps]
 
-source_file="res://MusicExpansion/Tracks/BorderZone/borderzone_mod_03.mp3"
+source_file="res://EchoesOfVostok/Tracks/BorderZone/borderzone_mod_03.mp3"
 dest_files=["res://.godot/imported/borderzone_mod_03.mp3-3ba16489c558a0168f66b126a66b13e2.mp3str"]
 
 [params]

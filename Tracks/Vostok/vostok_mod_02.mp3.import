@@ -7,7 +7,7 @@ path="res://.godot/imported/vostok_mod_02.mp3-5590165723d52f46c7add8b29a53f4b8.m
 
 [deps]
 
-source_file="res://MusicExpansion/Tracks/Vostok/vostok_mod_02.mp3"
+source_file="res://EchoesOfVostok/Tracks/Vostok/vostok_mod_02.mp3"
 dest_files=["res://.godot/imported/vostok_mod_02.mp3-5590165723d52f46c7add8b29a53f4b8.mp3str"]
 
 [params]

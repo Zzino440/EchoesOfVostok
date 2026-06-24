@@ -7,7 +7,7 @@ path="res://.godot/imported/area05_mod_05.mp3-ace5cb44f1b23633c0d92da88b85cd59.m
 
 [deps]
 
-source_file="res://MusicExpansion/Tracks/Area05/area05_mod_05.mp3"
+source_file="res://EchoesOfVostok/Tracks/Area05/area05_mod_05.mp3"
 dest_files=["res://.godot/imported/area05_mod_05.mp3-ace5cb44f1b23633c0d92da88b85cd59.mp3str"]
 
 [params]

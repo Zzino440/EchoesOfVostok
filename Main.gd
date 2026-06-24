@@ -1,6 +1,6 @@
 extends Node
 
-# Bootstrap for the Music Expansion mod.
+# Bootstrap for the Echoes Of Vostok mod.
 #
 # Adds new music tracks (.mp3/.ogg dropped in Tracks/<Zone>/) to the
 # dynamic in-game music system and to the main menu music,
@@ -13,13 +13,13 @@ extends Node
 #   DebugOverlay  -- shows the current track on screen when enabled
 #   Config        -- MCM (toggle, force track, volume)
 
-const MOD_ID := "music-expansion"
+const MOD_ID := "echoes-of-vostok"
 
-const _TrackLibraryScript  := preload("res://MusicExpansion/TrackLibrary.gd")
-const _MusicInjectorScript := preload("res://MusicExpansion/MusicInjector.gd")
-const _MenuMusicScript     := preload("res://MusicExpansion/MenuMusic.gd")
-const _DebugOverlayScript  := preload("res://MusicExpansion/DebugOverlay.gd")
-const _ConfigScript        := preload("res://MusicExpansion/Config.gd")
+const _TrackLibraryScript  := preload("res://EchoesOfVostok/TrackLibrary.gd")
+const _MusicInjectorScript := preload("res://EchoesOfVostok/MusicInjector.gd")
+const _MenuMusicScript     := preload("res://EchoesOfVostok/MenuMusic.gd")
+const _DebugOverlayScript  := preload("res://EchoesOfVostok/DebugOverlay.gd")
+const _ConfigScript        := preload("res://EchoesOfVostok/Config.gd")
 
 var _lib          = null
 var _library      = null

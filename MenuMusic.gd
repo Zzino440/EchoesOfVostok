@@ -24,7 +24,7 @@ func tick() -> void:
 
 	# Reset if the scene has changed
 	if scene != _handled_scene and _handled_scene != null:
-		print("[music-expansion] Menu: scene changed (%s), reset." % scene.name)
+		print("[echoes-of-vostok] Menu: scene changed (%s), reset." % scene.name)
 		_handled_scene = null
 
 	# Already handled for this scene
@@ -41,7 +41,7 @@ func tick() -> void:
 	if _parent_node.get_tree().root.get_node_or_null("Map/Core") != null:
 		return
 
-	print("[music-expansion] Menu: Audio node found on scene '%s', stream_paused=%s" % [
+	print("[echoes-of-vostok] Menu: Audio node found on scene '%s', stream_paused=%s" % [
 		scene.name, str(audio.stream_paused)
 	])
 
@@ -57,7 +57,7 @@ func tick() -> void:
 	if pool.is_empty() and ResourceLoader.exists(MENU_DEFAULT_PATH):
 		pool.append(load(MENU_DEFAULT_PATH))
 
-	print("[music-expansion] Menu: pool = %d mod tracks" % pool.size())
+	print("[echoes-of-vostok] Menu: pool = %d mod tracks" % pool.size())
 
 	if pool.is_empty():
 		return
@@ -72,4 +72,4 @@ func tick() -> void:
 		audio.play()
 
 	_handled_scene = scene
-	print("[music-expansion] Menu: track #%d selected and started." % idx)
+	print("[echoes-of-vostok] Menu: track #%d selected and started." % idx)

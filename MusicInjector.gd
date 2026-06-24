@@ -57,7 +57,7 @@ func tick() -> void:
 
 	if audio == null:
 		if _audio_node != null:
-			print("[music-expansion] Gameplay ended.")
+			print("[echoes-of-vostok] Gameplay ended.")
 			_audio_node    = null
 			_music_player  = null
 			_current_track_info.clear()
@@ -66,7 +66,7 @@ func tick() -> void:
 	if audio != _audio_node:
 		_audio_node   = audio
 		_music_player = audio.get_node_or_null("Music") as AudioStreamPlayer
-		print("[music-expansion] Audio node found. Music player: %s" % (
+		print("[echoes-of-vostok] Audio node found. Music player: %s" % (
 			"ok" if _music_player != null else "NOT FOUND"
 		))
 
@@ -105,7 +105,7 @@ func tick() -> void:
 	# Explicit force from MCM: absolute priority
 	if _force_stream != null:
 		_play_now(_force_stream, _force_display, _force_source, _force_zone, _force_track_index, _force_pool_count)
-		print("[music-expansion] Force: track started.")
+		print("[echoes-of-vostok] Force: track started.")
 		_clear_queued_force()
 		return
 
@@ -129,7 +129,7 @@ func tick() -> void:
 		int(chosen.get("track_index", 0)),
 		int(chosen.get("pool_count", 0))
 	)
-	print("[music-expansion] Zone '%s': started %s." % [
+	print("[echoes-of-vostok] Zone '%s': started %s." % [
 		zone_key,
 		str(chosen.get("display", "track"))
 	])
@@ -185,7 +185,7 @@ func force_track(
 	track_index: int = 0,
 	pool_count: int = 0
 ) -> void:
-	print("[music-expansion] force_track requested.")
+	print("[echoes-of-vostok] force_track requested.")
 	_force_stream = stream
 	_force_display = display_name
 	_force_source = source
@@ -193,7 +193,7 @@ func force_track(
 	_force_track_index = track_index
 	_force_pool_count = pool_count
 	if _music_player == null or not is_instance_valid(_music_player):
-		print("[music-expansion] force_track: music player not available (not in gameplay?).")
+		print("[echoes-of-vostok] force_track: music player not available (not in gameplay?).")
 		return
 	_cancel_tween()
 	_music_player.stop()
@@ -203,19 +203,19 @@ func force_track(
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 	var resolved_zone := get_resolved_zone_key(zone_key)
 	if resolved_zone.is_empty():
-		push_warning("[music-expansion] No valid area for track cycle.")
+		push_warning("[echoes-of-vostok] No valid area for track cycle.")
 		return
 	var pool: Array = _build_zone_pool(resolved_zone)
 	if pool.is_empty():
-		push_warning("[music-expansion] No tracks available for zone '%s'." % resolved_zone)
+		push_warning("[echoes-of-vostok] No tracks available for zone '%s'." % resolved_zone)
 		return
 	var safe_index := posmod(index_zero_based, pool.size())
 	var entry: Dictionary = pool[safe_index]
 	var stream: AudioStream = entry.get("stream", null)
 	if stream == null:
-		push_warning("[music-expansion] Track #%d invalid for zone '%s'." % [safe_index + 1, resolved_zone])
+		push_warning("[echoes-of-vostok] Track #%d invalid for zone '%s'." % [safe_index + 1, resolved_zone])
 		return
-	print("[music-expansion] Cycle zone '%s': %s" % [
+	print("[echoes-of-vostok] Cycle zone '%s': %s" % [
 		resolved_zone,
 		str(entry.get("display", "track"))
 	])

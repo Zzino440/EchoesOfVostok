@@ -54,7 +54,7 @@ func tick() -> void:
 
 func _format_info(info: Dictionary) -> String:
 	if info.is_empty():
-		return "MusicExpansion\nWAITING\nNo active gameplay track"
+		return "EchoesOfVostok\nWAITING\nNo active gameplay track"
 	var source: String = str(info.get("source", "unknown"))
 	var source_label: String = "CUSTOM" if source == "mod" else "VANILLA"
 	var display: String = str(info.get("display", "Unknown track"))
@@ -65,7 +65,7 @@ func _format_info(info: Dictionary) -> String:
 	var track_index: int = int(info.get("track_index", 0))
 	var pool_count: int = int(info.get("pool_count", 0))
 	var pool_label: String = "%d/%d" % [track_index, pool_count] if pool_count > 0 else "Unknown"
-	return "MusicExpansion\n%s\nTrack: %s\nZone: %s\nPool: %s" % [
+	return "EchoesOfVostok\n%s\nTrack: %s\nZone: %s\nPool: %s" % [
 		source_label,
 		display,
 		zone_label,

@@ -12,7 +12,7 @@ extends RefCounted
 
 const SEED_TRACK_PATH   := "res://Audio/Music/Road_to_Vostok_OST_Daybreak.mp3"
 const MENU_DEFAULT_PATH := "res://Audio/Music/Road_to_Vostok_OST_Far.mp3"
-const BASE_DIR          := "res://MusicExpansion/Tracks"
+const BASE_DIR          := "res://EchoesOfVostok/Tracks"
 
 # Folder name -> Audio.gd property key mapping
 const ZONE_DIRS := {
@@ -83,7 +83,7 @@ func scan() -> void:
 				(track_entries_by_zone[zone_key] as Array).append(entry)
 			our_streams.append(seed)
 			_register_track("[Test] Daybreak", seed)
-			print("[music-expansion] Test seed active: Daybreak added to all zones.")
+			print("[echoes-of-vostok] Test seed active: Daybreak added to all zones.")
 	else:
 		# Populate all_tracks with the real tracks found
 		for zone_key in track_entries_by_zone.keys():
@@ -109,7 +109,7 @@ func scan() -> void:
 	var counts := {}
 	for k in tracks_by_zone.keys():
 		counts[k] = (tracks_by_zone[k] as Array).size()
-	print("[music-expansion] Tracks loaded: in-game=%s, menu=%d" % [
+	print("[echoes-of-vostok] Tracks loaded: in-game=%s, menu=%d" % [
 		str(counts),
 		tracks_menu.size()
 	])
@@ -226,7 +226,7 @@ func _scan_audio(dir_path: String) -> Array:
 func _load_mp3_from_path(path: String) -> AudioStreamMP3:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_warning("[music-expansion] Cannot open: %s" % path)
+		push_warning("[echoes-of-vostok] Cannot open: %s" % path)
 		return null
 	var stream := AudioStreamMP3.new()
 	stream.data = file.get_buffer(file.get_length())
@@ -237,5 +237,5 @@ func _load_mp3_from_path(path: String) -> AudioStreamMP3:
 func _load_mp3_resource(res_path: String) -> AudioStreamMP3:
 	if ResourceLoader.exists(res_path):
 		return load(res_path) as AudioStreamMP3
-	push_warning("[music-expansion] Resource not found: %s" % res_path)
+	push_warning("[echoes-of-vostok] Resource not found: %s" % res_path)
 	return null
