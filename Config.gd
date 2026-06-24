@@ -1,17 +1,17 @@
 extends RefCounted
 
-# Gestisce MCM e il file di configurazione ini.
-# Degrada pulitamente se MCM non e' installato (usa i valori di default).
+# Manages MCM and the ini configuration file.
+# Degrades cleanly if MCM is not installed (uses default values).
 #
-# Opzioni MCM:
-#  - Bool  "enabled"        -- toggle generale mod
-#  - Dropdown "selection_mode" -- random o ciclo sul pool vanilla+mod
-#  - Dropdown "force_track" -- forza un brano specifico (debug)
-#  - Dropdown "test_area"   -- area da usare per il ciclo manuale
-#  - Int "cycle_area_track" -- indice 1-based del pool vanilla+mod dell'area
-#  - Bool "debug_overlay_enabled" -- mostra traccia corrente su schermo
-#  - Dropdown "debug_overlay_position" -- posizione overlay debug
-#  - Float "track_volume_db" -- offset volume tracce mod
+# MCM options:
+#  - Bool  "enabled"        -- global mod toggle
+#  - Dropdown "selection_mode" -- random or cycle through the vanilla+mod pool
+#  - Dropdown "force_track" -- force a specific track (debug)
+#  - Dropdown "test_area"   -- area to use for the manual cycle
+#  - Int "cycle_area_track" -- 1-based index into the vanilla+mod pool for the area
+#  - Bool "debug_overlay_enabled" -- show current track on screen
+#  - Dropdown "debug_overlay_position" -- debug overlay position
+#  - Float "track_volume_db" -- volume offset for mod tracks
 
 const MOD_ID         := "music-expansion"
 const MCM_MOD_ID     := "MusicExpansion"
@@ -31,8 +31,8 @@ const SELECTION_OPTIONS := {
 const OVERLAY_TOP_LEFT := "top_left"
 const OVERLAY_TOP_RIGHT := "top_right"
 const OVERLAY_POSITION_OPTIONS := {
-	OVERLAY_TOP_LEFT: "Alto sinistra",
-	OVERLAY_TOP_RIGHT: "Alto destra",
+	OVERLAY_TOP_LEFT: "Top left",
+	OVERLAY_TOP_RIGHT: "Top right",
 }
 const AREA_CURRENT      := "current"
 const AREA_LABEL_CURRENT := "Current Area"
@@ -70,8 +70,8 @@ var _last_cycle_menu = null
 var _last_resolved_cycle_zone := ""
 var _syncing_cycle_control: bool = false
 
-## Inizializza: carica/crea config ini e registra MCM se disponibile.
-## on_update: Callable senza argomenti, chiamata dopo ogni cambio di config.
+## Initialises: loads/creates the ini config and registers MCM if available.
+## on_update: Callable with no arguments, called after every config change.
 func setup(library, injector, on_update: Callable) -> void:
 	_library  = library
 	_injector = injector
@@ -97,19 +97,19 @@ func setup(library, injector, on_update: Callable) -> void:
 	_last_cycle_signature = _cycle_signature()
 
 	if _mcm_helpers == null:
-		print("[%s] MCM non trovato, uso valori di default." % MOD_ID)
+		print("[%s] MCM not found, using default values." % MOD_ID)
 		return
 
 	_mcm_helpers.RegisterConfiguration(
 		MCM_MOD_ID,
 		"Music Expansion",
 		MCM_FILE_PATH,
-		"Aggiunge nuove tracce musicali alle zone di gioco e al menu. Inserisci file .mp3 in MusicExpansion/Tracks/<Zona>/.",
+		"Adds new music tracks to the game zones and the main menu. Drop .mp3 files into MusicExpansion/Tracks/<Zone>/.",
 		{"config.ini": _on_mcm_save},
 		self
 	)
 
-# Callback MCM: viene chiamata al salvataggio della config dall'UI MCM.
+# MCM callback: called when the config is saved from the MCM UI.
 func _on_mcm_save(config: ConfigFile) -> void:
 	var config_changed := _refresh_dynamic_config(config)
 	if config_changed:
@@ -117,19 +117,19 @@ func _on_mcm_save(config: ConfigFile) -> void:
 	_apply_config(config)
 	if _on_update.is_valid():
 		_on_update.call()
-	print("[%s] config aggiornata: enabled=%s, volume_db=%.1f dB" % [MOD_ID, enabled, volume_db])
+	print("[%s] config updated: enabled=%s, volume_db=%.1f dB" % [MOD_ID, enabled, volume_db])
 
-# Callback live Dropdown: chiamata mentre l'utente seleziona nel pannello MCM.
-# Firma richiesta da MCM: func(value_id, new_value, menu).
+# Live Dropdown callback: called while the user selects a value in the MCM panel.
+# Required MCM signature: func(value_id, new_value, menu).
 func _on_force_track_changed(value_id: String, new_value, _menu) -> void:
-	print("[music-expansion] MCM dropdown cambiato: '%s'" % str(new_value))
+	print("[music-expansion] MCM dropdown changed: '%s'" % str(new_value))
 	if _injector == null:
 		return
 	if _is_force_off(new_value):
 		_injector.clear_force()
 	else:
 		var stream: AudioStream = _resolve_track_stream(new_value)
-		print("[music-expansion] Stream trovato in library: %s" % ("si" if stream != null else "NO"))
+		print("[music-expansion] Stream found in library: %s" % ("yes" if stream != null else "NO"))
 		if stream != null:
 			_injector.force_track(stream)
 
@@ -177,7 +177,7 @@ func refresh_current_area_range(menu = null) -> void:
 			cycle_track_number = _clamp_cycle_track_number(cycle_track_number, cycle_area_key)
 			changed = true
 	if changed:
-		print("[music-expansion] Current Area aggiornata: zona=%s pool=%d track=%d" % [
+		print("[music-expansion] Current Area updated: zone=%s pool=%d track=%d" % [
 			cycle_area_key,
 			_cycle_range_for_area(cycle_area_key),
 			cycle_track_number,
@@ -196,7 +196,7 @@ func _apply_config(config: ConfigFile) -> void:
 	debug_overlay_enabled = bool(_cfg(config, "Bool", "debug_overlay_enabled", false))
 	debug_overlay_position = _resolve_debug_overlay_position(_cfg(config, "Dropdown", "debug_overlay_position", OVERLAY_TOP_RIGHT))
 
-	# Applica forza brano se salvata
+	# Apply forced track if saved
 	if _injector != null:
 		var force_val = _cfg(config, "Dropdown", "force_track", FORCE_OFF_LABEL)
 		print("[music-expansion] _apply_config: enabled=%s paused=%s force='%s'" % [enabled, paused, force_val])
@@ -207,31 +207,31 @@ func _apply_config(config: ConfigFile) -> void:
 			if stream != null:
 				_injector.force_track(stream)
 			else:
-				push_warning("[music-expansion] Traccia '%s' non trovata in library." % force_val)
+				push_warning("[music-expansion] Track '%s' not found in library." % force_val)
 
 func _build_default_config() -> ConfigFile:
 	var c := ConfigFile.new()
 
-	# Raccoglie i nomi delle tracce per il dropdown
+	# Collect track names for the dropdown
 	var options := _force_track_options()
 
 	c.set_value("Bool", "enabled", {
-		"name":    "Abilita mod",
-		"tooltip": "Attiva o disattiva la gestione musica da questa mod.",
+		"name":    "Enable mod",
+		"tooltip": "Enables or disables music management by this mod.",
 		"default": DEFAULT_ENABLED,
 		"value":   DEFAULT_ENABLED,
 		"menu_pos": 1,
 	})
 	c.set_value("Bool", "paused", {
-		"name":    "Pausa musica",
-		"tooltip": "Silenzia la musica in-game (utile per debug). Premi Salva per applicare.",
+		"name":    "Pause music",
+		"tooltip": "Silences in-game music (useful for debugging). Press Save to apply.",
 		"default": DEFAULT_PAUSED,
 		"value":   DEFAULT_PAUSED,
 		"menu_pos": 2,
 	})
 	c.set_value("Dropdown", "selection_mode", {
-		"name":    "Modalita selezione",
-		"tooltip": "Random sceglie casualmente dal pool vanilla+mod. Cycle avanza in ordine nel pool della zona.",
+		"name":    "Selection mode",
+		"tooltip": "Random picks randomly from the vanilla+mod pool. Cycle advances in order through the zone pool.",
 		"default": SELECTION_RANDOM,
 		"value":   SELECTION_RANDOM,
 		"options": SELECTION_OPTIONS,
@@ -239,8 +239,8 @@ func _build_default_config() -> ConfigFile:
 		"menu_pos": 3,
 	})
 	c.set_value("Dropdown", "force_track", {
-		"name":    "Forza brano (debug)",
-		"tooltip": "Seleziona una traccia e premi Salva per farla partire subito. '(Off)' torna alla modalita' dinamica.",
+		"name":    "Force track (debug)",
+		"tooltip": "Select a track and press Save to start it immediately. '(Off)' returns to dynamic mode.",
 		"default": FORCE_OFF_LABEL,
 		"value":   FORCE_OFF_LABEL,
 		"options": options,
@@ -248,8 +248,8 @@ func _build_default_config() -> ConfigFile:
 		"menu_pos": 4,
 	})
 	c.set_value("Dropdown", "test_area", {
-		"name":    "Area da testare",
-		"tooltip": "Scegli quale area usare per il ciclo manuale. Current Area usa la mappa in cui ti trovi.",
+		"name":    "Test area",
+		"tooltip": "Choose which area to use for the manual cycle. Current Area uses the map you are currently in.",
 		"default": AREA_LABEL_CURRENT,
 		"value":   AREA_LABEL_CURRENT,
 		"options": AREA_OPTIONS,
@@ -257,8 +257,8 @@ func _build_default_config() -> ConfigFile:
 		"menu_pos": 5,
 	})
 	c.set_value("Int", "cycle_area_track", {
-		"name":     "Ciclo tracce area",
-		"tooltip":  "Numero della traccia nel pool vanilla+mod della zona effettiva. Con Current Area il range reale segue la mappa corrente; l'overlay mostra Pool: indice/totale.",
+		"name":     "Area track cycle",
+		"tooltip":  "Track number in the vanilla+mod pool for the active zone. With Current Area the real range follows the current map; the overlay shows Pool: index/total.",
 		"default":  1,
 		"value":    1,
 		"minRange": 1,
@@ -268,16 +268,16 @@ func _build_default_config() -> ConfigFile:
 		"menu_pos": 6,
 	})
 	c.set_value("Bool", "debug_overlay_enabled", {
-		"name":    "Overlay debug musica",
-		"tooltip": "Mostra a schermo il brano corrente e se arriva dal gioco base o dalla mod.",
+		"name":    "Music debug overlay",
+		"tooltip": "Shows the current track on screen and whether it comes from the base game or the mod.",
 		"default": false,
 		"value":   false,
 		"on_value_changed": "_on_debug_overlay_enabled_changed",
 		"menu_pos": 7,
 	})
 	c.set_value("Dropdown", "debug_overlay_position", {
-		"name":    "Posizione overlay debug",
-		"tooltip": "Scegli dove mostrare il testo di debug della musica.",
+		"name":    "Debug overlay position",
+		"tooltip": "Choose where to display the music debug text.",
 		"default": OVERLAY_TOP_RIGHT,
 		"value":   OVERLAY_TOP_RIGHT,
 		"options": OVERLAY_POSITION_OPTIONS,
@@ -285,8 +285,8 @@ func _build_default_config() -> ConfigFile:
 		"menu_pos": 8,
 	})
 	c.set_value("Float", "track_volume_db", {
-		"name":     "Volume tracce mod (dB)",
-		"tooltip":  "Offset volume delle tracce aggiunte. 0 = stesso livello delle tracce vanilla.",
+		"name":     "Mod track volume (dB)",
+		"tooltip":  "Volume offset for added tracks. 0 = same level as vanilla tracks.",
 		"default":  DEFAULT_VOLUME_DB,
 		"value":    DEFAULT_VOLUME_DB,
 		"minRange": -24.0,

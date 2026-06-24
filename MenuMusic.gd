@@ -1,17 +1,17 @@
 extends RefCounted
 
-# Randomizza la traccia del menu iniziale scegliendo tra:
-#  - Tracce in Tracks/Menu/ (mp3/ogg)
-#  - Traccia vanilla "Far" (sempre inclusa nel pool per non escluderla mai)
+# Randomises the main menu track by choosing from:
+#  - Tracks in Tracks/Menu/ (mp3/ogg)
+#  - Vanilla track "Far" (always included in the pool so it is never excluded)
 #
-# La logica si attiva una sola volta per ogni ingresso nella scena menu
-# e rispetta la preferenza "Menu Music" off dell'utente (stream_paused).
+# The logic fires once per entry into the menu scene
+# and respects the user's "Menu Music" off preference (stream_paused).
 
 const MENU_DEFAULT_PATH := "res://Audio/Music/Road_to_Vostok_OST_Far.mp3"
 
 var _library = null
 var _parent_node: Node = null
-var _handled_scene: Node = null  # scena menu gia' randomizzata in questa sessione
+var _handled_scene: Node = null  # menu scene already randomised in this session
 
 func setup(library, parent_node: Node) -> void:
 	_library = library
@@ -22,42 +22,42 @@ func tick() -> void:
 	if scene == null:
 		return
 
-	# Resetta se la scena e' cambiata
+	# Reset if the scene has changed
 	if scene != _handled_scene and _handled_scene != null:
-		print("[music-expansion] Menu: scena cambiata (%s), reset." % scene.name)
+		print("[music-expansion] Menu: scene changed (%s), reset." % scene.name)
 		_handled_scene = null
 
-	# Gia' gestita per questa scena
+	# Already handled for this scene
 	if _handled_scene != null:
 		return
 
-	# Cerca il nodo Audio come figlio diretto del root (serve che sia AudioStreamPlayer)
+	# Look for the Audio node as a direct child of the root (must be AudioStreamPlayer)
 	var audio := scene.get_node_or_null("Audio") as AudioStreamPlayer
 	if audio == null:
-		# Niente AudioStreamPlayer di nome "Audio" in questa scena (siamo in gameplay)
+		# No AudioStreamPlayer named "Audio" in this scene (we are in gameplay)
 		return
 
-	# Assicurati di non essere in gameplay (gameplay ha /root/Map/Core)
+	# Make sure we are not in gameplay (gameplay has /root/Map/Core)
 	if _parent_node.get_tree().root.get_node_or_null("Map/Core") != null:
 		return
 
-	print("[music-expansion] Menu: nodo Audio trovato su scena '%s', stream_paused=%s" % [
+	print("[music-expansion] Menu: Audio node found on scene '%s', stream_paused=%s" % [
 		scene.name, str(audio.stream_paused)
 	])
 
-	# --- Siamo nel menu: randomizza lo stream ---
+	# --- We are in the menu: randomise the stream ---
 	var pool: Array = []
 
-	# Prima scelta: tracce Tracks/Menu/ (se presenti)
+	# First choice: tracks from Tracks/Menu/ (if any)
 	for s in _library.tracks_menu:
 		pool.append(s)
 
-	# Se non ci sono tracce mod, aggiungi anche Far come fallback
-	# (cosi' con il seed di test Daybreak viene scelta sempre)
+	# If there are no mod tracks, also add Far as a fallback
+	# (so with the Daybreak test seed it is always chosen)
 	if pool.is_empty() and ResourceLoader.exists(MENU_DEFAULT_PATH):
 		pool.append(load(MENU_DEFAULT_PATH))
 
-	print("[music-expansion] Menu: pool = %d tracce mod" % pool.size())
+	print("[music-expansion] Menu: pool = %d mod tracks" % pool.size())
 
 	if pool.is_empty():
 		return
@@ -67,9 +67,9 @@ func tick() -> void:
 	audio.stop()
 	audio.stream = chosen
 
-	# Rispetta la preferenza menuMusic off (stream_paused = true significa OFF)
+	# Respect the menuMusic off preference (stream_paused = true means OFF)
 	if not audio.stream_paused:
 		audio.play()
 
 	_handled_scene = scene
-	print("[music-expansion] Menu: traccia #%d scelta e avviata." % idx)
+	print("[music-expansion] Menu: track #%d selected and started." % idx)

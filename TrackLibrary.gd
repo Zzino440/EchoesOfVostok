@@ -1,20 +1,20 @@
 extends RefCounted
 
-# Scansiona le sottocartelle Tracks/ e carica le tracce audio a runtime.
+# Scans the Tracks/ subdirectories and loads audio tracks at runtime.
 #
-# In-game: solo .mp3 (Array[AudioStreamMP3] vanilla e' tipizzato).
-# Menu: .mp3 e .ogg (stream non tipizzato).
+# In-game: .mp3 only (vanilla Array[AudioStreamMP3] is typed).
+# Menu: .mp3 and .ogg (untyped stream).
 #
-# Se tutte le cartelle zona sono vuote attiva il seed di test:
-# inietta la traccia vanilla Daybreak in tutte le zone e nel menu,
-# cosi' l'iniezione/force/menu sono verificabili senza file esterni.
-# Il seed sparisce non appena l'utente droppa almeno un .mp3 reale.
+# If all zone folders are empty the test seed is activated:
+# it injects the vanilla Daybreak track into all zones and the menu,
+# so injection/force/menu can be verified without external files.
+# The seed disappears as soon as the user drops at least one real .mp3.
 
 const SEED_TRACK_PATH   := "res://Audio/Music/Road_to_Vostok_OST_Daybreak.mp3"
 const MENU_DEFAULT_PATH := "res://Audio/Music/Road_to_Vostok_OST_Far.mp3"
 const BASE_DIR          := "res://MusicExpansion/Tracks"
 
-# Mappatura nome-cartella -> chiave proprieta' in Audio.gd
+# Folder name -> Audio.gd property key mapping
 const ZONE_DIRS := {
 	"Area05":     "area05",
 	"BorderZone": "borderZone",
@@ -29,19 +29,19 @@ const ZONE_LABELS := {
 	"shelter":    "Shelter",
 }
 
-# Dizionario zona_key -> Array (elementi AudioStreamMP3)
+# zone_key -> Array (AudioStreamMP3 elements)
 var tracks_by_zone: Dictionary = {}
-# Dizionario zona_key -> Array[Dictionary] con metadati delle tracce mod.
+# zone_key -> Array[Dictionary] with mod track metadata.
 var track_entries_by_zone: Dictionary = {}
-# Tracce per il menu (AudioStreamMP3 o AudioStreamOggVorbis)
+# Menu tracks (AudioStreamMP3 or AudioStreamOggVorbis)
 var tracks_menu: Array = []
-# display_name -> AudioStream (per il dropdown MCM)
+# display_name -> AudioStream (for the MCM dropdown)
 var all_tracks: Dictionary = {}
-# Instance ID stream -> display_name, per overlay/debug.
+# Stream instance ID -> display_name, for overlay/debug.
 var display_by_stream_id: Dictionary = {}
-# Ordine stabile dei display name usati dai dropdown MCM.
+# Stable display name order used by MCM dropdowns.
 var display_names: Array = []
-# Lista flat di tutti gli stream "nostri" (per identificarli nel MusicInjector)
+# Flat list of all "our" streams (to identify them in MusicInjector)
 var our_streams: Array = []
 
 func scan() -> void:
@@ -53,7 +53,7 @@ func scan() -> void:
 	display_names.clear()
 	our_streams.clear()
 
-	# --- Zone in-game (solo .mp3) ---
+	# --- In-game zones (.mp3 only) ---
 	for dir_name in ZONE_DIRS.keys():
 		var zone_key: String = ZONE_DIRS[dir_name]
 		var entries: Array = _scan_mp3_entries(BASE_DIR + "/" + dir_name, zone_key)
@@ -65,7 +65,7 @@ func scan() -> void:
 		for s in mp3s:
 			our_streams.append(s)
 
-	# Controlla se tutte le zone sono vuote
+	# Check whether all zones are empty
 	var all_empty := true
 	for zone_key in tracks_by_zone.keys():
 		if (tracks_by_zone[zone_key] as Array).size() > 0:
@@ -73,7 +73,7 @@ func scan() -> void:
 			break
 
 	if all_empty:
-		# Seed di test: Daybreak in tutte le zone
+		# Test seed: Daybreak in all zones
 		var seed: AudioStreamMP3 = _load_mp3_resource(SEED_TRACK_PATH)
 		if seed != null:
 			for zone_key in tracks_by_zone.keys():
@@ -83,14 +83,14 @@ func scan() -> void:
 				(track_entries_by_zone[zone_key] as Array).append(entry)
 			our_streams.append(seed)
 			_register_track("[Test] Daybreak", seed)
-			print("[music-expansion] Seed di test attivo: Daybreak aggiunta a tutte le zone.")
+			print("[music-expansion] Test seed active: Daybreak added to all zones.")
 	else:
-		# Popola all_tracks con le tracce reali trovate
+		# Populate all_tracks with the real tracks found
 		for zone_key in track_entries_by_zone.keys():
 			for entry in track_entries_by_zone[zone_key]:
 				_register_track(str(entry["display"]), entry["stream"])
 
-	# --- Menu (.mp3 e .ogg) ---
+	# --- Menu (.mp3 and .ogg) ---
 	tracks_menu = _scan_audio(BASE_DIR + "/Menu")
 	for i in range(tracks_menu.size()):
 		var s: AudioStream = tracks_menu[i]
@@ -98,7 +98,7 @@ func scan() -> void:
 		var display := "[Menu] %d" % (i + 1)
 		_register_track(display, s)
 
-	# Seed menu se vuoto
+	# Menu seed if empty
 	if tracks_menu.is_empty():
 		var seed: AudioStreamMP3 = _load_mp3_resource(SEED_TRACK_PATH)
 		if seed != null:
@@ -109,7 +109,7 @@ func scan() -> void:
 	var counts := {}
 	for k in tracks_by_zone.keys():
 		counts[k] = (tracks_by_zone[k] as Array).size()
-	print("[music-expansion] Tracce caricate: in-game=%s, menu=%d" % [
+	print("[music-expansion] Tracks loaded: in-game=%s, menu=%d" % [
 		str(counts),
 		tracks_menu.size()
 	])
@@ -152,7 +152,7 @@ func describe_zone_index(zone_key: String, index_zero_based: int) -> String:
 		return ""
 	return str(entries[index_zero_based].get("display", ""))
 
-# ── Caricamento ────────────────────────────────────────────────────────────────
+# ── Loading ───────────────────────────────────────────────────────────────────
 
 func _register_track(display_name: String, stream: AudioStream) -> void:
 	all_tracks[display_name] = stream
@@ -179,7 +179,7 @@ func _scan_mp3_entries(dir_path: String, zone_key: String) -> Array:
 			result.append(_make_entry(zone_key, fname, display, stream))
 	return result
 
-# Scansiona dir_path cercando file .mp3 e ritorna un Array di AudioStreamMP3.
+# Scans dir_path for .mp3 files and returns an Array of AudioStreamMP3.
 func _scan_mp3(dir_path: String) -> Array:
 	var result: Array = []
 	for entry in _scan_mp3_entries(dir_path, ""):
@@ -205,7 +205,7 @@ func _list_audio_files(dir_path: String, extensions: Array) -> Array:
 	result.sort()
 	return result
 
-# Scansiona dir_path cercando .mp3 e .ogg (per il menu).
+# Scans dir_path for .mp3 and .ogg files (for the menu).
 func _scan_audio(dir_path: String) -> Array:
 	var result: Array = []
 	var file_names: Array = _list_audio_files(dir_path, ["mp3", "ogg"])
@@ -222,20 +222,20 @@ func _scan_audio(dir_path: String) -> Array:
 				result.append(s)
 	return result
 
-# Carica un .mp3 da path filesystem tramite FileAccess (funziona senza import).
+# Loads a .mp3 from a filesystem path via FileAccess (works without import).
 func _load_mp3_from_path(path: String) -> AudioStreamMP3:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_warning("[music-expansion] Impossibile aprire: %s" % path)
+		push_warning("[music-expansion] Cannot open: %s" % path)
 		return null
 	var stream := AudioStreamMP3.new()
 	stream.data = file.get_buffer(file.get_length())
 	file.close()
 	return stream
 
-# Carica un .mp3 gia' importato come risorsa Godot (res://).
+# Loads a .mp3 already imported as a Godot resource (res://).
 func _load_mp3_resource(res_path: String) -> AudioStreamMP3:
 	if ResourceLoader.exists(res_path):
 		return load(res_path) as AudioStreamMP3
-	push_warning("[music-expansion] Risorsa non trovata: %s" % res_path)
+	push_warning("[music-expansion] Resource not found: %s" % res_path)
 	return null

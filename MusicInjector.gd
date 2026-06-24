@@ -1,12 +1,12 @@
 extends RefCounted
 
-# Gestisce la selezione delle tracce in gameplay.
-# Strategia: invece di iniettare negli array tipizzati di Audio.gd (inaffidabile),
-# intercettiamo direttamente il momento in cui la musica smette di suonare.
-# Il nostro autoload processa PRIMA dei nodi scena, quindi quando chiamiamo play()
-# vanilla vede is_playing()=true e salta la sua logica di selezione.
+# Manages track selection during gameplay.
+# Strategy: instead of injecting into the typed arrays of Audio.gd (unreliable),
+# we intercept the exact moment music stops playing.
+# Our autoload processes BEFORE scene nodes, so when we call play()
+# vanilla sees is_playing()=true and skips its own selection logic.
 #
-# Pool combinato: tracce vanilla della zona + tracce mod -> selezione casuale equa.
+# Combined pool: zone vanilla tracks + mod tracks -> fair random selection.
 
 const ZONE_KEY_MAP := {
 	"Shelter":     "shelter",
@@ -51,13 +51,13 @@ func setup(library, parent_node: Node) -> void:
 	_library     = library
 	_parent_node = parent_node
 
-# Chiamato ogni physics frame da Main (senza throttle).
+# Called every physics frame from Main (no throttle).
 func tick() -> void:
 	var audio := _find_audio_node()
 
 	if audio == null:
 		if _audio_node != null:
-			print("[music-expansion] Gameplay terminato.")
+			print("[music-expansion] Gameplay ended.")
 			_audio_node    = null
 			_music_player  = null
 			_current_track_info.clear()
@@ -66,25 +66,25 @@ func tick() -> void:
 	if audio != _audio_node:
 		_audio_node   = audio
 		_music_player = audio.get_node_or_null("Music") as AudioStreamPlayer
-		print("[music-expansion] Nodo Audio trovato. Music player: %s" % (
-			"ok" if _music_player != null else "NON TROVATO"
+		print("[music-expansion] Audio node found. Music player: %s" % (
+			"ok" if _music_player != null else "NOT FOUND"
 		))
 
 	if _music_player == null or not is_instance_valid(_music_player):
 		return
 
-	# --- Pausa esplicita dal mod menu: silenzia davvero la musica ---
+	# --- Explicit pause from the mod menu: actually silence the music ---
 	if paused:
 		if _music_player.volume_db != -80.0:
 			_music_player.volume_db = -80.0
 		return
 
-	# --- Mod disabilitata: rilascia il player alla logica vanilla ---
+	# --- Mod disabled: release the player back to vanilla logic ---
 	if not enabled:
 		_release_to_vanilla()
 		return
 
-	# --- Ripristina volume se non c'e' tween attivo ---
+	# --- Restore volume if no tween is running ---
 	var tween_running := _force_tween != null and is_instance_valid(_force_tween) and _force_tween.is_running()
 	if not tween_running:
 		var is_ours: bool = _music_player.stream != null and _library.is_our_stream(_music_player.stream)
@@ -92,20 +92,20 @@ func tick() -> void:
 		if _music_player.volume_db != target:
 			_music_player.volume_db = target
 
-	# --- Se la musica sta suonando non c'e' nulla da fare ---
+	# --- Music is playing, nothing to do ---
 	if _music_player.is_playing():
 		return
 
-	# --- Musica ferma: decidiamo noi cosa suonare ---
+	# --- Music stopped: we decide what to play ---
 
-	# Rispetta preset "musica off"
+	# Respect "music off" preset
 	if _game_data.musicPreset == 1:
 		return
 
-	# Force esplicito da MCM: ha priorita' assoluta
+	# Explicit force from MCM: absolute priority
 	if _force_stream != null:
 		_play_now(_force_stream, _force_display, _force_source, _force_zone, _force_track_index, _force_pool_count)
-		print("[music-expansion] Force: traccia avviata.")
+		print("[music-expansion] Force: track started.")
 		_clear_queued_force()
 		return
 
@@ -123,18 +123,18 @@ func tick() -> void:
 		return
 	_play_now(
 		stream,
-		str(chosen.get("display", "traccia")),
+		str(chosen.get("display", "track")),
 		str(chosen.get("source", "")),
 		zone_key,
 		int(chosen.get("track_index", 0)),
 		int(chosen.get("pool_count", 0))
 	)
-	print("[music-expansion] Zona '%s': avviata %s." % [
+	print("[music-expansion] Zone '%s': started %s." % [
 		zone_key,
-		str(chosen.get("display", "traccia"))
+		str(chosen.get("display", "track"))
 	])
 
-# ── API pubblica ───────────────────────────────────────────────────────────────
+# ── Public API ────────────────────────────────────────────────────────────────
 
 func get_current_track_info() -> Dictionary:
 	if _music_player != null and is_instance_valid(_music_player) and _music_player.stream != null:
@@ -176,7 +176,7 @@ func set_volume(db: float) -> void:
 func set_selection_mode(mode: String) -> void:
 	selection_mode = SELECTION_CYCLE if mode == SELECTION_CYCLE else SELECTION_RANDOM
 
-# Forza la riproduzione di uno stream con fade out ~1s poi play.
+# Forces playback of a stream with ~1s fade out then play.
 func force_track(
 	stream: AudioStream,
 	display_name: String = "",
@@ -185,7 +185,7 @@ func force_track(
 	track_index: int = 0,
 	pool_count: int = 0
 ) -> void:
-	print("[music-expansion] force_track richiesto.")
+	print("[music-expansion] force_track requested.")
 	_force_stream = stream
 	_force_display = display_name
 	_force_source = source
@@ -193,7 +193,7 @@ func force_track(
 	_force_track_index = track_index
 	_force_pool_count = pool_count
 	if _music_player == null or not is_instance_valid(_music_player):
-		print("[music-expansion] force_track: music player non disponibile (non sei in gameplay?).")
+		print("[music-expansion] force_track: music player not available (not in gameplay?).")
 		return
 	_cancel_tween()
 	_music_player.stop()
@@ -203,25 +203,25 @@ func force_track(
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 	var resolved_zone := get_resolved_zone_key(zone_key)
 	if resolved_zone.is_empty():
-		push_warning("[music-expansion] Nessuna area valida per il ciclo tracce.")
+		push_warning("[music-expansion] No valid area for track cycle.")
 		return
 	var pool: Array = _build_zone_pool(resolved_zone)
 	if pool.is_empty():
-		push_warning("[music-expansion] Nessuna traccia disponibile per zona '%s'." % resolved_zone)
+		push_warning("[music-expansion] No tracks available for zone '%s'." % resolved_zone)
 		return
 	var safe_index := posmod(index_zero_based, pool.size())
 	var entry: Dictionary = pool[safe_index]
 	var stream: AudioStream = entry.get("stream", null)
 	if stream == null:
-		push_warning("[music-expansion] Traccia #%d non valida per zona '%s'." % [safe_index + 1, resolved_zone])
+		push_warning("[music-expansion] Track #%d invalid for zone '%s'." % [safe_index + 1, resolved_zone])
 		return
-	print("[music-expansion] Ciclo zona '%s': %s" % [
+	print("[music-expansion] Cycle zone '%s': %s" % [
 		resolved_zone,
-		str(entry.get("display", "traccia"))
+		str(entry.get("display", "track"))
 	])
 	force_track(
 		stream,
-		str(entry.get("display", "traccia")),
+		str(entry.get("display", "track")),
 		str(entry.get("source", "")),
 		resolved_zone,
 		safe_index + 1,
@@ -231,7 +231,7 @@ func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 func clear_force() -> void:
 	_clear_queued_force()
 
-# ── Interno ────────────────────────────────────────────────────────────────────
+# ── Internal ──────────────────────────────────────────────────────────────────
 
 func _find_audio_node() -> Node:
 	if not is_instance_valid(_parent_node):
