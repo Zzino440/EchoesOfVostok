@@ -179,13 +179,6 @@ func _scan_mp3_entries(dir_path: String, zone_key: String) -> Array:
 			result.append(_make_entry(zone_key, fname, display, stream))
 	return result
 
-# Scans dir_path for .mp3 files and returns an Array of AudioStreamMP3.
-func _scan_mp3(dir_path: String) -> Array:
-	var result: Array = []
-	for entry in _scan_mp3_entries(dir_path, ""):
-		result.append(entry["stream"])
-	return result
-
 func _list_audio_files(dir_path: String, extensions: Array) -> Array:
 	var result: Array = []
 	var dir := DirAccess.open(dir_path)

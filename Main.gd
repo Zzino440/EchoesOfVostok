@@ -7,26 +7,29 @@ extends Node
 # without modifying any vanilla files.
 #
 # Structure:
-#   TrackLibrary  -- scans and loads tracks at runtime
-#   MusicInjector -- injects tracks into Audio.gd zone arrays
-#   MenuMusic     -- randomises the menu track
-#   DebugOverlay  -- shows the current track on screen when enabled
-#   Config        -- MCM (toggle, force track, volume)
+#   TrackLibrary    -- scans and loads tracks at runtime
+#   MusicInjector   -- intercepts Audio.gd zone selection
+#   MenuMusic       -- randomises the menu track
+#   CycleControl    -- Test area / Area track cycle MCM logic
+#   DebugOverlay    -- shows the current track on screen when enabled
+#   Config          -- MCM (toggle, force track, volume)
 
 const MOD_ID := "echoes-of-vostok"
 
-const _TrackLibraryScript  := preload("res://EchoesOfVostok/TrackLibrary.gd")
-const _MusicInjectorScript := preload("res://EchoesOfVostok/MusicInjector.gd")
-const _MenuMusicScript     := preload("res://EchoesOfVostok/MenuMusic.gd")
-const _DebugOverlayScript  := preload("res://EchoesOfVostok/DebugOverlay.gd")
-const _ConfigScript        := preload("res://EchoesOfVostok/Config.gd")
+const _TrackLibraryScript   := preload("res://EchoesOfVostok/TrackLibrary.gd")
+const _MusicInjectorScript  := preload("res://EchoesOfVostok/MusicInjector.gd")
+const _MenuMusicScript      := preload("res://EchoesOfVostok/MenuMusic.gd")
+const _CycleControlScript   := preload("res://EchoesOfVostok/CycleControl.gd")
+const _DebugOverlayScript   := preload("res://EchoesOfVostok/DebugOverlay.gd")
+const _ConfigScript         := preload("res://EchoesOfVostok/Config.gd")
 
-var _lib          = null
-var _library      = null
-var _injector     = null
-var _menu_music   = null
+var _lib           = null
+var _library       = null
+var _injector      = null
+var _menu_music    = null
+var _cycle_control = null
 var _debug_overlay = null
-var _config       = null
+var _config        = null
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 
@@ -52,15 +55,19 @@ func _initialize() -> void:
 	_menu_music = _MenuMusicScript.new()
 	_menu_music.setup(_library, self)
 
+	# 3. CycleControl must be ready before Config (Config reads cycle range in _build_default_config)
+	_cycle_control = _CycleControlScript.new()
+	_cycle_control.setup(_library, _injector)
+
 	_debug_overlay = _DebugOverlayScript.new()
 	add_child(_debug_overlay)
 	_debug_overlay.setup(_injector)
 
-	# 3. Register MCM and load config (must happen after _injector, for force_track)
+	# 4. Register MCM and load config
 	_config = _ConfigScript.new()
-	_config.setup(_library, _injector, _on_config_updated)
+	_config.setup(_library, _injector, _cycle_control, _on_config_updated)
 
-	# 4. Apply initial state from config
+	# 5. Apply initial state from config
 	_injector.set_enabled(_config.enabled)
 	_injector.set_paused(_config.paused)
 	_injector.set_volume(_config.volume_db)
@@ -73,7 +80,6 @@ func _initialize() -> void:
 	])
 
 func _exit_tree() -> void:
-	# Restore vanilla arrays when the mod is unloaded
 	if _injector != null:
 		_injector.set_enabled(false)
 
@@ -83,12 +89,11 @@ func _physics_process(_delta: float) -> void:
 	if _injector == null or _config == null:
 		return
 
-	# Injector: every frame (to catch the exact moment music stops)
 	_injector.tick()
 
-	# Menu: throttled, not time-critical
 	if Engine.get_physics_frames() % 20 == 0:
-		_config.refresh_current_area_range()
+		if _cycle_control != null:
+			_cycle_control.refresh_current_area_range()
 		_menu_music.tick()
 		_debug_overlay.tick()
 

@@ -8,6 +8,8 @@ extends RefCounted
 #
 # Combined pool: zone vanilla tracks + mod tracks -> fair random selection.
 
+const _DEBUG := false
+
 const ZONE_KEY_MAP := {
 	"Shelter":     "shelter",
 	"Tutorial":    "shelter",
@@ -24,6 +26,8 @@ const VANILLA_TRACK_COUNTS := {
 	"vostok": 4,
 	"shelter": 2,
 }
+
+const FADE_DURATION := 1.0
 
 var enabled: bool = true
 var paused: bool = false
@@ -45,6 +49,7 @@ var _force_track_index: int       = 0
 var _force_pool_count: int        = 0
 var _force_tween: Tween           = null
 var _cycle_indices_by_zone: Dictionary = {}
+var _last_random_index_by_zone: Dictionary = {}
 var _current_track_info: Dictionary = {}
 
 func setup(library, parent_node: Node) -> void:
@@ -57,7 +62,7 @@ func tick() -> void:
 
 	if audio == null:
 		if _audio_node != null:
-			print("[echoes-of-vostok] Gameplay ended.")
+			if _DEBUG: print("[echoes-of-vostok] Gameplay ended.")
 			_audio_node    = null
 			_music_player  = null
 			_current_track_info.clear()
@@ -105,7 +110,7 @@ func tick() -> void:
 	# Explicit force from MCM: absolute priority
 	if _force_stream != null:
 		_play_now(_force_stream, _force_display, _force_source, _force_zone, _force_track_index, _force_pool_count)
-		print("[echoes-of-vostok] Force: track started.")
+		if _DEBUG: print("[echoes-of-vostok] Force: track started.")
 		_clear_queued_force()
 		return
 
@@ -129,7 +134,7 @@ func tick() -> void:
 		int(chosen.get("track_index", 0)),
 		int(chosen.get("pool_count", 0))
 	)
-	print("[echoes-of-vostok] Zone '%s': started %s." % [
+	if _DEBUG: print("[echoes-of-vostok] Zone '%s': started %s." % [
 		zone_key,
 		str(chosen.get("display", "track"))
 	])
@@ -176,7 +181,7 @@ func set_volume(db: float) -> void:
 func set_selection_mode(mode: String) -> void:
 	selection_mode = SELECTION_CYCLE if mode == SELECTION_CYCLE else SELECTION_RANDOM
 
-# Forces playback of a stream with ~1s fade out then play.
+# Forces playback of a stream with a fade-out of the current track then a fade-in of the new one.
 func force_track(
 	stream: AudioStream,
 	display_name: String = "",
@@ -185,7 +190,7 @@ func force_track(
 	track_index: int = 0,
 	pool_count: int = 0
 ) -> void:
-	print("[echoes-of-vostok] force_track requested.")
+	if _DEBUG: print("[echoes-of-vostok] force_track requested.")
 	_force_stream = stream
 	_force_display = display_name
 	_force_source = source
@@ -193,12 +198,23 @@ func force_track(
 	_force_track_index = track_index
 	_force_pool_count = pool_count
 	if _music_player == null or not is_instance_valid(_music_player):
-		print("[echoes-of-vostok] force_track: music player not available (not in gameplay?).")
+		if _DEBUG: print("[echoes-of-vostok] force_track: music player not available (not in gameplay?).")
 		return
 	_cancel_tween()
-	_music_player.stop()
-	_play_now(stream, display_name, source, zone_key, track_index, pool_count)
-	_clear_queued_force()
+	if _music_player.is_playing():
+		_force_tween = _parent_node.create_tween()
+		_force_tween.tween_property(_music_player, "volume_db", -80.0, FADE_DURATION)
+		_force_tween.tween_callback(func():
+			if not is_instance_valid(_music_player):
+				_clear_queued_force()
+				return
+			_music_player.stop()
+			_play_now(stream, display_name, source, zone_key, track_index, pool_count)
+			_clear_queued_force()
+		)
+	else:
+		_play_now(stream, display_name, source, zone_key, track_index, pool_count)
+		_clear_queued_force()
 
 func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 	var resolved_zone := get_resolved_zone_key(zone_key)
@@ -215,7 +231,7 @@ func force_zone_track(zone_key: String, index_zero_based: int) -> void:
 	if stream == null:
 		push_warning("[echoes-of-vostok] Track #%d invalid for zone '%s'." % [safe_index + 1, resolved_zone])
 		return
-	print("[echoes-of-vostok] Cycle zone '%s': %s" % [
+	if _DEBUG: print("[echoes-of-vostok] Cycle zone '%s': %s" % [
 		resolved_zone,
 		str(entry.get("display", "track"))
 	])
@@ -304,6 +320,11 @@ func _select_pool_entry(zone_key: String, pool: Array) -> Dictionary:
 		selected_index = index
 	else:
 		selected_index = randi() % pool.size()
+		if pool.size() > 1:
+			var last_index := int(_last_random_index_by_zone.get(zone_key, -1))
+			if selected_index == last_index:
+				selected_index = (selected_index + 1) % pool.size()
+		_last_random_index_by_zone[zone_key] = selected_index
 	var selected: Dictionary = pool[selected_index].duplicate()
 	selected["track_index"] = selected_index + 1
 	selected["pool_count"] = pool.size()
@@ -318,9 +339,12 @@ func _play_now(
 	pool_count: int = 0
 ) -> void:
 	_cancel_tween()
+	var target_vol := volume_db_offset if _library.is_our_stream(stream) else 0.0
 	_music_player.stream = stream
-	_music_player.volume_db = volume_db_offset if _library.is_our_stream(stream) else 0.0
+	_music_player.volume_db = -80.0
 	_music_player.play()
+	_force_tween = _parent_node.create_tween()
+	_force_tween.tween_property(_music_player, "volume_db", target_vol, FADE_DURATION)
 	_current_track_info = {
 		"display": _fallback_display_name(stream, display_name),
 		"source": _fallback_source(stream, source),
